@@ -1,5 +1,5 @@
 import express from 'express'
-import { registerHandling } from '../controllers/auth.controllers.js'
+import { registerHandling, longinHandling, refreshHandling, logoutHandling } from '../controllers/auth.controllers.js'
 import {z} from 'zod'
 import { validate } from '../middleware/validate.middleware.js'
 
@@ -11,6 +11,14 @@ const registerSchema = z.object({
     password: z.string().min(8).max(128)
 })
 
+const loginSchema = z.object({
+    email: z.email(),
+    password: z.string().min(1).max(128)
+})
+
 router.post('/register', validate(registerSchema), registerHandling)
+router.post('/login', validate(loginSchema), longinHandling)
+router.post('/refresh', refreshHandling)
+router.post('/logout', logoutHandling)
 
 export default router
