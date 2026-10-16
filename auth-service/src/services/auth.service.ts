@@ -101,3 +101,15 @@ export const logoutUser = async (refToken: string) => {
     const tokenHash = hashRefreshToken(refToken)
     await RefreshToken.deleteOne({tokenHash})
 }
+
+export const getCurrentUser = async (userId: string) => {
+    const user = await User.findById(userId)
+
+    if (!user)
+        throw (new AppError(404, 'USER_NOT_FOUND', 'User not found'))
+    return ({
+        id: user.id,
+        email: user.email,
+        name: user.name
+    })
+}

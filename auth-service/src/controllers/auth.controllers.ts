@@ -1,5 +1,7 @@
 import { type Request, type Response, type NextFunction } from "express";
-import { registerUser, loginUser, refreshAccessToken, logoutUser } from "../services/auth.service.js";
+import { registerUser, loginUser, refreshAccessToken, logoutUser,
+    getCurrentUser
+ } from "../services/auth.service.js";
 import { AppError } from "../utils/AppError.js";
 
 export const registerHandling = async (req: Request, res: Response) => {
@@ -85,6 +87,20 @@ export const logoutHandling = async (req: Request, res: Response, next: NextFunc
             path: '/api/auth'
         })
         res.status(204).send()
+    }
+    catch (err)
+    {
+        next(err)
+    }
+}
+
+export const getMeHandling = async (req: Request, res: Response, next: NextFunction) => {
+    try
+    {
+        if (!req.userId)
+            throw new AppError(401, 'UNAUTHORIZED', 'Authentication required')
+        const user = await getCurrentUser(req.userId)
+        return (res.status(200).json({user}))
     }
     catch (err)
     {

@@ -1,7 +1,10 @@
 import express from 'express'
-import { registerHandling, longinHandling, refreshHandling, logoutHandling } from '../controllers/auth.controllers.js'
+import { registerHandling, longinHandling, refreshHandling, logoutHandling,
+    getMeHandling
+ } from '../controllers/auth.controllers.js'
 import {z} from 'zod'
 import { validate } from '../middleware/validate.middleware.js'
+import { authenticate } from '../middleware/auth.middleware.js'
 
 const router = express.Router()
 
@@ -20,5 +23,7 @@ router.post('/register', validate(registerSchema), registerHandling)
 router.post('/login', validate(loginSchema), longinHandling)
 router.post('/refresh', refreshHandling)
 router.post('/logout', logoutHandling)
+router.get('/me', authenticate, getMeHandling)
+
 
 export default router
