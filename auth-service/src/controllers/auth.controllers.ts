@@ -59,7 +59,7 @@ export const refreshHandling = async (req: Request, res: Response, next: NextFun
             )
         }
         const result = await refreshAccessToken(refreshToken)
-        res.cookie('refreshToken', result.newRefreshToken, {
+        res.cookie('refreshToken', result.refreshToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict',

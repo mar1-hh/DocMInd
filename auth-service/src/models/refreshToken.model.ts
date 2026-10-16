@@ -3,6 +3,8 @@ import mongoose, { Schema } from 'mongoose'
 interface IRefreshToken {
   userId: mongoose.Types.ObjectId
   tokenHash: string
+  usedTokenHashes: string[]
+  revokedAt: Date | null
   expiresAt: Date
 }
 
@@ -16,6 +18,14 @@ const refreshTokenSchema = new Schema<IRefreshToken>({
     type: String,
     required: true,
     unique: true
+  },
+  usedTokenHashes: {
+    type: [String],
+    default: []
+  },
+  revokedAt: {
+    type: Date,
+    default: null
   },
   expiresAt: {
     type: Date,

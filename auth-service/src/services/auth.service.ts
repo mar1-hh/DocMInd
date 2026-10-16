@@ -57,7 +57,7 @@ export const loginUser = async (data: loginData) => {
     const refreshToken = generateRefreshToken()
     const tokenHash = hashRefreshToken(refreshToken)
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-    RefreshToken.create({
+    await RefreshToken.create({
         userId: user.id,
         tokenHash,
         expiresAt
@@ -69,36 +69,71 @@ export const loginUser = async (data: loginData) => {
     }})
 }
 
-export const refreshAccessToken = async (token: string) => {
-    const secret = process.env.JWT_ACCESS_SECRET
-    if (!secret)
-        throw new Error('JWT_ACCESS_SECRET is not defined')
-    const hashedToken = hashRefreshToken(token)
-    const newRefreshToken = generateRefreshToken()
-    const newHashedRefresh = hashRefreshToken(newRefreshToken)
-    const expiresAt = new Date(
-        Date.now() + 7 * 24 * 60 * 60 * 1000
-    )
-    const isExist = await RefreshToken.findOneAndUpdate(
-        {
-            tokenHash: hashedToken,
-            expiresAt : {$gt : new Date()}
-        },
-        {
-            $set: {
-                tokenHash: newHashedRefresh,
-                expiresAt
-            }
-        }
-    )
-    if (!isExist || isExist.expiresAt <= new Date())
+export const refreshAccessToken = async (refreshToken: string) => {
+  const tokenHash = hashRefreshToken(refreshToken)
+
+  const newRefreshToken = generateRefreshToken()
+  const newTokenHash = hashRefreshToken(newRefreshToken)
+
+  const expiresAt = new Date(
+    Date.now() + 7 * 24 * 60 * 60 * 1000
+  )
+  const session = await RefreshToken.findOneAndUpdate(
     {
-        throw new AppError(401,
+      tokenHash,
+      revokedAt: null,
+      expiresAt: { $gt: new Date() }
+    },
+    {
+      $set: {
+        tokenHash: newTokenHash,
+        expiresAt
+      },
+      $push: {
+        usedTokenHashes: tokenHash
+      }
+    },
+    { returnDocument: 'after' }
+  )
+  if (!session) {
+    await RefreshToken.updateOne(
+      {
+        usedTokenHashes: tokenHash,
+        revokedAt: null
+      },
+      {
+        $set: {
+          revokedAt: new Date()
+        }
+      }
+    )
+
+    throw new AppError(
+      401,
       'INVALID_REFRESH_TOKEN',
-      'Invalid or expired refresh token')
+      'Invalid or expired refresh token'
+    )
+  }
+
+  const secret = process.env.JWT_ACCESS_SECRET
+
+  if (!secret) {
+    throw new Error('JWT_ACCESS_SECRET is not defined')
+  }
+
+  const accessToken = jwt.sign(
+    { sub: session.userId.toString() },
+    secret,
+    {
+      expiresIn: '15m',
+      algorithm: 'HS256'
     }
-    const newToken = jwt.sign({sub: isExist.userId}, secret, {expiresIn: '15m', algorithm: 'HS256'})
-    return ({accessToken: newToken, newRefreshToken})
+  )
+
+  return {
+    accessToken,
+    refreshToken: newRefreshToken
+  }
 }
 
 export const logoutUser = async (refToken: string) => {
