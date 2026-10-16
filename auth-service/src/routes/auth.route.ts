@@ -5,6 +5,7 @@ import { registerHandling, longinHandling, refreshHandling, logoutHandling,
 import {z} from 'zod'
 import { validate } from '../middleware/validate.middleware.js'
 import { authenticate } from '../middleware/auth.middleware.js'
+import { authLimiter } from '../middleware/rateLimit.middleware.js'
 
 const router = express.Router()
 
@@ -19,8 +20,8 @@ const loginSchema = z.object({
     password: z.string().min(1).max(128)
 })
 
-router.post('/register', validate(registerSchema), registerHandling)
-router.post('/login', validate(loginSchema), longinHandling)
+router.post('/register', authLimiter, validate(registerSchema), registerHandling)
+router.post('/login', authLimiter, validate(loginSchema), longinHandling)
 router.post('/refresh', refreshHandling)
 router.post('/logout', logoutHandling)
 router.get('/me', authenticate, getMeHandling)
