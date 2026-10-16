@@ -34,7 +34,21 @@ export const authenticate = (
     req.userId = payload.sub
 
     next()
-  } catch (error) {
-    next(error)
   }
+  catch (error)
+  {
+    if (error instanceof jwt.TokenExpiredError) {
+        return next(
+        new AppError(401, 'TOKEN_EXPIRED', 'Access token expired')
+        )
+    }
+
+    if (error instanceof jwt.JsonWebTokenError) {
+        return next(
+        new AppError(401, 'INVALID_TOKEN', 'Invalid access token')
+        )
+    }
+
+    next(error)
+}
 }

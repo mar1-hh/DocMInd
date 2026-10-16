@@ -45,7 +45,11 @@ export const loginUser = async (data: loginData) => {
     const user = await User.findOne({email}).select('+password')
     const isCorrect = (user === null ? false : await bcrypt.compare(password, user.password))
     if (!user || !isCorrect)
-        throw new Error('invalid username or password')
+        throw new AppError(
+            401,
+            'INVALID_CREDENTIALS',
+            'Invalid email or password'
+        )
     const userToken = {
         sub: user.id,
     }
