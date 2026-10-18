@@ -16,6 +16,7 @@ services:
       - ./auth-service/.env
     environment:
       MONGO_URI: mongodb://mongodb:27017/docmind_auth
+      PORT: "3001"
     depends_on:
       - mongodb
 
