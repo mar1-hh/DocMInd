@@ -1,5 +1,5 @@
 
-.PHONY: help build up down start stop restart logs ps clean rebuild
+.PHONY: help build up down start stop restart logs ps clean rebuild fclean
 
 COMPOSE = docker compose
 
@@ -49,5 +49,3 @@ rebuild:
 
 fclean:
 	$(COMPOSE) down --rmi local --volumes --remove-orphans
-
-.PHONY: fclean
