@@ -5,9 +5,11 @@ import mongoose from 'mongoose'
 import { MongoMemoryServer } from 'mongodb-memory-server'
 import request from 'supertest'
 import jwt from 'jsonwebtoken'
+import { ipKeyGenerator } from 'express-rate-limit'
 import app from '../src/app.js'
 import User from '../src/models/user.model.js'
 import RefreshToken from '../src/models/refreshToken.model.js'
+import { authLimiter } from '../src/middleware/rateLimit.middleware.js'
 
 // Never load .env or use MONGO_URI: this suite owns its MongoDB process and database.
 process.env.NODE_ENV = 'test'
@@ -41,6 +43,8 @@ before(async () => {
 }, { timeout: 120_000 })
 
 beforeEach(async () => {
+  await Promise.all(['127.0.0.1', '::ffff:127.0.0.1', '::1']
+    .map(ip => authLimiter.resetKey(ipKeyGenerator(ip))))
   assert.equal(mongoose.connection.name, database)
   await Promise.all([User.deleteMany({}), RefreshToken.deleteMany({})])
 })

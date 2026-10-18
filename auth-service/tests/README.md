@@ -35,3 +35,30 @@ session remains active.
 The refresh response cookie must match the successor hash stored in MongoDB.
 Login waits for session persistence before responding so immediate refresh
 requests can find the session.
+
+Proxy deployment contract: client -> NGINX -> Auth. Express trusts exactly one
+hop, and NGINX overwrites `X-Forwarded-For` and `X-Real-IP` with `$remote_addr`.
+The Auth port is exposed only within Docker, never published to the host.
+Do not publish port 3001 or put another proxy in front of NGINX without revisiting
+this trust configuration. Containers on the network and the Docker host are
+trusted; a direct caller of Auth could supply a forged forwarding header.
+
+`npm test` also checks proxy hop trust, independent client rate-limit counters,
+spoofed multi-address headers, and the NGINX header configuration. All tests use
+the real 10-request limit; authentication tests reset only their local test
+client's counter between cases.
+
+For a real NGINX check, run:
+
+```sh
+node tests/gateway-smoke.mjs
+```
+
+This requires Docker and builds a separate disposable Compose project with two
+client containers, the real Auth service, NGINX configuration, and MongoDB. It
+validates `nginx -t`, tries rotating forged forwarding headers through NGINX,
+checks a second client's independent counter, and exercises registration, login,
+`/me`, refresh, and logout through the gateway. It also checks that the deployment
+Compose file publishes no Auth port. No host ports, development database, or
+`.env` secrets are used by the test containers; cleanup removes their containers,
+network, and volumes even on test failure.
