@@ -84,13 +84,21 @@ test('session persists through reload using one rotating refresh request', async
   expect(refreshCalls).toBe(1)
 })
 
-test('logout ends the session and denies protected access afterward', async ({ page }) => {
+test('logout ends the session in both open tabs and denies protected access afterward', async ({ page, context }) => {
   const user = uniqueUser()
   await register(page, user)
   await login(page, user)
+  const otherTab = await context.newPage()
+  await otherTab.goto('/')
+  await expect(otherTab.getByRole('heading', { name: `Welcome, ${user.name}`, exact: true })).toBeVisible()
+  await otherTab.getByRole('button', { name: 'Check session', exact: true }).click()
+  await expect(otherTab.getByRole('status')).toHaveText('Your session is active.')
   const logout = page.waitForResponse((response) => response.url().endsWith('/api/auth/logout'))
   await page.getByRole('button', { name: 'Sign out', exact: true }).click()
   expect((await logout).status()).toBe(204)
+  await expect(otherTab).toHaveURL(/\/login$/)
+  await expect(otherTab.getByRole('button', { name: 'Check session', exact: true })).toHaveCount(0)
+  await expect(otherTab.getByRole('heading', { name: 'Welcome back' })).toBeVisible()
   await expect(page).toHaveURL(/\/login$/)
   await expect.poll(async () => (await page.context().cookies()).some((cookie) => cookie.name === 'refreshToken')).toBe(false)
   await page.goto('/')

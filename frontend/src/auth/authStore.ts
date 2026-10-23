@@ -17,7 +17,16 @@ async function cookieLock<T>(operation: () => Promise<T>): Promise<T> {
   return operation()
 }
 
-export function createAuthStore(fetcher: typeof fetch = (...args) => fetch(...args)) {
+function createLogoutChannel(): BroadcastChannel | null {
+  // Avoid opening a channel in SSR and Node tests unless explicitly supplied.
+  if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return null
+  return new BroadcastChannel('docmind-auth')
+}
+
+export function createAuthStore(
+  fetcher: typeof fetch = (...args) => fetch(...args),
+  channelFactory: () => BroadcastChannel | null = createLogoutChannel,
+) {
   const request = createApi(fetcher)
   let state: AuthState = { status: 'restoring', user: null, error: null, loggingOut: false, logoutFailed: false }
   let accessToken: string | null = null
@@ -31,6 +40,16 @@ export function createAuthStore(fetcher: typeof fetch = (...args) => fetch(...ar
   const publish = (next: AuthState) => {
     state = next
     listeners.forEach((listener) => listener())
+  }
+  const channel = channelFactory()
+  if (channel) {
+    channel.onmessage = ({ data }: MessageEvent<unknown>) => {
+      if (!data || typeof data !== 'object' || !('type' in data) || data.type !== 'logout') return
+      // Invalidate login, restoration, refresh and protected requests already in flight.
+      ++revision
+      accessToken = null
+      publish({ status: 'anonymous', user: null, error: null, loggingOut: false, logoutFailed: false })
+    }
   }
   // Cookie-changing operations must finish in order, including a refresh already in flight at logout.
   function serialized<T>(operation: () => Promise<T>): Promise<T> {
@@ -70,6 +89,10 @@ export function createAuthStore(fetcher: typeof fetch = (...args) => fetch(...ar
   }
   return {
     getSnapshot: () => state,
+    dispose() {
+      channel?.close()
+      listeners.clear()
+    },
     subscribe(listener: () => void) {
       listeners.add(listener)
       return () => { listeners.delete(listener) }
@@ -109,6 +132,7 @@ export function createAuthStore(fetcher: typeof fetch = (...args) => fetch(...ar
       ++revision
       accessToken = null
       publish({ status: 'anonymous', user: null, error: null, loggingOut: true, logoutFailed: false })
+      channel?.postMessage({ type: 'logout' })
       logoutPromise = serialized(async () => {
         try {
           await request('/logout', jsonPost())

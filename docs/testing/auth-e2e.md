@@ -89,7 +89,7 @@ docker compose -f docker-compose.e2e.yaml down
 2. Login shows the actual user's account page; the session-check button successfully calls `/me`.
 3. A registered user's incorrect password returns 401, displays the API error, and leaves the protected route inaccessible.
 4. Reload restores the signed-in user, uses exactly one refresh request, and rotates the HttpOnly/SameSite Strict refresh cookie.
-5. Logout returns 204, removes the refresh cookie, and prevents protected access after navigation and reload.
+5. Logout returns 204, removes the refresh cookie, signs out another open tab without a reload, and prevents protected access after navigation and reload.
 6. A fresh unauthenticated browser context is redirected from `/` to `/login`.
 
 Every test has its own browser context and unique UUID-based user credentials; no test relies on an account or browser state created by another test. Setup uses the UI, not direct database writes. There are no fixed sleeps: locators, response events, and Playwright assertions provide waiting.
@@ -104,6 +104,6 @@ The safe reporter intentionally omits raw failure payloads. A failing test title
 
 ## Verified run
 
-On 2026-10-23, all six Chromium scenarios passed against this Docker stack: 6 passed, 0 failed, 0 skipped. Frontend lint, E2E TypeScript checking, the production build, and all ten existing frontend store tests also passed. The build retains its existing advisory about the main JavaScript chunk exceeding 500 kB. The isolated stack was removed afterward; the development containers were left running.
+On 2026-10-23, all six Chromium scenarios passed against this Docker stack: 6 passed, 0 failed, 0 skipped. Frontend lint, E2E TypeScript checking, the production build, and all fourteen frontend store tests (including cross-tab logout race coverage) also passed. The build retains its existing advisory about the main JavaScript chunk exceeding 500 kB. The isolated stack was removed afterward; the development containers were left running.
 
 Playwright references: [test configuration](https://playwright.dev/docs/test-configuration) and [CLI commands](https://playwright.dev/docs/test-cli).

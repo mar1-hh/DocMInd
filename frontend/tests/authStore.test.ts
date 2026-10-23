@@ -215,3 +215,48 @@ test('a second unauthorized response after refresh stops after one retry', async
   assert.equal(meRequests, 3)
   assert.equal(store.getSnapshot().user, null)
 })
+
+for (const pending of ['request', 'login', 'restore', 'refresh'] as const) {
+  test(`cross-tab logout invalidates an in-flight ${pending}`, { timeout: 5000 }, async (t) => {
+    const channelFactory = () => new BroadcastChannel(`docmind-auth-test-${pending}`)
+    const started = deferred()
+    const finish = deferred()
+    let hold = false
+    let receiverLogouts = 0
+    const sender = createAuthStore(async () => new Response(null, { status: 204 }), channelFactory)
+    const receiver = createAuthStore(async (url) => {
+      if (url === '/api/auth/logout') ++receiverLogouts
+      const delayed = pending === 'login' ? url === '/api/auth/login'
+        : pending === 'request' ? url === '/api/auth/me' : url === '/api/auth/refresh'
+      if (hold && delayed) {
+        started.resolve()
+        await finish.promise
+      }
+      if (url === '/api/auth/login') return json({ accesstoken: 'login-token', user })
+      if (url === '/api/auth/refresh') return json({ accessToken: 'refreshed-token' })
+      if (pending === 'refresh' && hold) return json({ message: 'Expired' }, 401)
+      return json({ user })
+    }, channelFactory)
+    t.after(() => { finish.resolve(); sender.dispose(); receiver.dispose() })
+    await receiver.login(input)
+    hold = true
+    const operation = pending === 'login' ? receiver.login(input)
+      : pending === 'restore' ? receiver.restore() : receiver.authenticatedRequest('/me')
+    const settled = operation.then(() => 'resolved', () => 'rejected')
+    await started.promise
+    const received = deferred()
+    receiver.subscribe(() => {
+      if (receiver.getSnapshot().status === 'anonymous') received.resolve()
+    })
+    const logout = sender.logout()
+    await received.promise
+    assert.equal(receiver.getSnapshot().user, null)
+    await assert.rejects(receiver.authenticatedRequest('/me'), /Please sign in/)
+    finish.resolve()
+    assert.equal(await settled, pending === 'restore' ? 'resolved' : 'rejected')
+    await logout
+    assert.equal(receiver.getSnapshot().status, 'anonymous')
+    assert.equal(receiver.getSnapshot().user, null)
+    assert.equal(receiverLogouts, 0, 'receiving logout must not send another server logout')
+  })
+}
