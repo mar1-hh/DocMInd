@@ -17,7 +17,7 @@ async function cookieLock<T>(operation: () => Promise<T>): Promise<T> {
   return operation()
 }
 
-function createLogoutChannel(): BroadcastChannel | null {
+function createSessionChannel(): BroadcastChannel | null {
   // Avoid opening a channel in SSR and Node tests unless explicitly supplied.
   if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return null
   return new BroadcastChannel('docmind-auth')
@@ -25,7 +25,7 @@ function createLogoutChannel(): BroadcastChannel | null {
 
 export function createAuthStore(
   fetcher: typeof fetch = (...args) => fetch(...args),
-  channelFactory: () => BroadcastChannel | null = createLogoutChannel,
+  channelFactory: () => BroadcastChannel | null = createSessionChannel,
 ) {
   const request = createApi(fetcher)
   let state: AuthState = { status: 'restoring', user: null, error: null, loggingOut: false, logoutFailed: false }
@@ -44,11 +44,11 @@ export function createAuthStore(
   const channel = channelFactory()
   if (channel) {
     channel.onmessage = ({ data }: MessageEvent<unknown>) => {
-      if (!data || typeof data !== 'object' || !('type' in data) || data.type !== 'logout') return
+      if (!data || typeof data !== 'object' || !('type' in data) || (data.type !== 'logout' && data.type !== 'login')) return
       // Invalidate login, restoration, refresh and protected requests already in flight.
       ++revision
       accessToken = null
-      publish({ status: 'anonymous', user: null, error: null, loggingOut: false, logoutFailed: false })
+      publish({ status: 'anonymous', user: null, error: data.type === 'login' ? 'The session changed in another tab. Please sign in again.' : null, loggingOut: false, logoutFailed: false })
     }
   }
   // Cookie-changing operations must finish in order, including a refresh already in flight at logout.
@@ -64,6 +64,7 @@ export function createAuthStore(
     if (refreshPromise) return refreshPromise
     if (state.loggingOut) return Promise.reject(new ApiError('Sign out is in progress.'))
     const expected = revision
+    const expectedUserId = state.user?.id
     refreshPromise = serialized(async () => {
       ensureCurrent(expected)
       try {
@@ -71,6 +72,10 @@ export function createAuthStore(
         ensureCurrent(expected)
         const { user } = parseResponse(meResponseSchema, await request('/me', { headers: { Authorization: `Bearer ${data.accessToken}` } }))
         ensureCurrent(expected)
+        if (expectedUserId !== undefined && user.id !== expectedUserId) {
+          // Keep the new shared cookie intact, but never replay this account's request as someone else.
+          throw new ApiError('The session account changed. Please sign in again.', 401, 'SESSION_CHANGED')
+        }
         accessToken = data.accessToken
         ++tokenVersion
         publish({ status: 'authenticated', user, error: null, loggingOut: false, logoutFailed: false })
@@ -79,7 +84,9 @@ export function createAuthStore(
           ++revision
           accessToken = null
           const expired = error instanceof ApiError && (error.status === 401 || error.code === 'USER_NOT_FOUND')
-          const message = expired ? (state.user ? 'Your session has expired. Please sign in again.' : null) : errorMessage(error)
+          const message = error instanceof ApiError && error.code === 'SESSION_CHANGED'
+            ? error.message
+            : expired ? (state.user ? 'Your session has expired. Please sign in again.' : null) : errorMessage(error)
           publish({ status: expired ? 'anonymous' : 'error', user: null, error: message, loggingOut: false, logoutFailed: false })
         }
         throw error
@@ -125,6 +132,7 @@ export function createAuthStore(
         accessToken = data.accesstoken // Backend login spelling differs from refresh.
         ++tokenVersion
         publish({ status: 'authenticated', user: data.user, error: null, loggingOut: false, logoutFailed: false })
+        channel?.postMessage({ type: 'login' })
       })
     },
     logout(): Promise<void> {

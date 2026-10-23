@@ -260,3 +260,91 @@ for (const pending of ['request', 'login', 'restore', 'refresh'] as const) {
     assert.equal(receiverLogouts, 0, 'receiving logout must not send another server logout')
   })
 }
+
+test('refresh rejects a different identity before installing its token or replaying the request', async () => {
+  const calls: string[] = []
+  const otherUser = { ...user, id: 'user-2', name: 'Bob' }
+  const store = createAuthStore(async (url, init) => {
+    calls.push(String(url))
+    if (url === '/api/auth/login') return json({ accesstoken: 'alice-token', user })
+    if (url === '/api/auth/refresh') return json({ accessToken: 'bob-token' })
+    if (url === '/api/auth/me') {
+      assert.equal(new Headers(init?.headers).get('Authorization'), 'Bearer bob-token')
+      // Identity verification is allowed; replaying the original operation is not.
+      assert.equal(store.getSnapshot().user?.id, user.id)
+      return json({ user: otherUser })
+    }
+    assert.equal(url, '/api/auth/protected-operation')
+    assert.equal(new Headers(init?.headers).get('Authorization'), 'Bearer alice-token')
+    return json({ message: 'Expired' }, 401)
+  })
+  await store.login(input)
+  await assert.rejects(store.authenticatedRequest('/protected-operation', { method: 'POST' }), (error: unknown) => {
+    assert.ok(error instanceof ApiError)
+    assert.equal(error.code, 'SESSION_CHANGED')
+    return true
+  })
+  assert.equal(store.getSnapshot().status, 'anonymous')
+  assert.equal(store.getSnapshot().user, null)
+  await assert.rejects(store.authenticatedRequest('/me'), /Please sign in/)
+  assert.deepEqual(calls, ['/api/auth/login', '/api/auth/protected-operation', '/api/auth/refresh', '/api/auth/me'])
+})
+
+test('successful cross-tab login broadcasts only an invalidation and never logs out the new session', { timeout: 5000 }, async (t) => {
+  const channelFactory = () => new BroadcastChannel('docmind-test-login-event')
+  const calls: string[] = []
+  const receiver = createAuthStore(async (url) => {
+    calls.push(String(url))
+    return json({ accesstoken: 'old-token', user })
+  }, channelFactory)
+  await receiver.login(input)
+  const sender = createAuthStore(async () => json({ accesstoken: 'private-token', user }), channelFactory)
+  const observer = channelFactory()
+  t.after(() => { sender.dispose(); receiver.dispose(); observer.close() })
+  const received = deferred()
+  receiver.subscribe(() => { if (receiver.getSnapshot().status === 'anonymous') received.resolve() })
+  const message = new Promise<unknown>((resolve) => { observer.onmessage = ({ data }) => resolve(data) })
+  await sender.login(input)
+  await received.promise
+  assert.deepEqual(await message, { type: 'login' })
+  assert.equal(receiver.getSnapshot().user, null)
+  assert.equal(sender.getSnapshot().status, 'authenticated')
+  await assert.rejects(receiver.authenticatedRequest('/me'), /Please sign in/)
+  assert.deepEqual(calls, ['/api/auth/login'])
+})
+
+for (const phase of ['refresh', 'identity lookup'] as const) {
+  test(`cross-tab session change invalidates an in-flight ${phase}`, { timeout: 5000 }, async (t) => {
+    const channelFactory = () => new BroadcastChannel(`docmind-test-login-race-${phase}`)
+    const peer = channelFactory()
+    const started = deferred()
+    const finish = deferred()
+    let protectedCalls = 0
+    const store = createAuthStore(async (url) => {
+      if (url === '/api/auth/login') return json({ accesstoken: 'old-token', user })
+      if (url === '/api/auth/protected') { ++protectedCalls; return json({ message: 'Expired' }, 401) }
+      if (url === (phase === 'refresh' ? '/api/auth/refresh' : '/api/auth/me')) {
+        started.resolve()
+        await finish.promise
+      }
+      if (url === '/api/auth/refresh') return json({ accessToken: 'late-token' })
+      assert.equal(url, '/api/auth/me', 'must not call logout')
+      return json({ user })
+    }, channelFactory)
+    t.after(() => { finish.resolve(); store.dispose(); peer.close() })
+    await store.login(input)
+    const operation = assert.rejects(store.authenticatedRequest('/protected'))
+    await started.promise
+    const received = deferred()
+    store.subscribe(() => { if (store.getSnapshot().status === 'anonymous') received.resolve() })
+    // A delayed login event can arrive during either network await, even with cookie Web Locks.
+    peer.postMessage({ type: 'login' })
+    await received.promise
+    finish.resolve()
+    await operation
+    assert.equal(store.getSnapshot().status, 'anonymous')
+    assert.equal(store.getSnapshot().user, null)
+    assert.equal(protectedCalls, 1)
+    await assert.rejects(store.authenticatedRequest('/me'), /Please sign in/)
+  })
+}

@@ -1,6 +1,6 @@
 # Authentication end-to-end tests
 
-These six Playwright Chromium tests drive the real React UI through Vite → the existing Nginx configuration → the real Express auth-service → a dedicated MongoDB database. No API responses are mocked.
+These eight Playwright Chromium tests drive the real React UI through Vite → the existing Nginx configuration → the real Express auth-service → a dedicated MongoDB database. No API responses are mocked.
 
 ## Requirements
 
@@ -53,7 +53,7 @@ npm run test:e2e
 cd ..
 ```
 
-The safe reporter prints each test's title, pass/fail status, and source line for failing steps. A nonzero exit code means setup or at least one test failed. Tests do not start Docker automatically. If setup fails before tests run, check that the stack is healthy and that Chromium is installed:
+The safe reporter prints each test's title, pass/fail status, and source line for failing steps. A nonzero exit code means setup or at least one test failed. Tests require the isolated stack to be running. Before each spec file, they verify its environment marker, restart only the test auth-service to clear its process-local rate-limit window, and wait for health. They never restart the development stack. If setup fails before tests run, check that the stack is healthy and that Chromium is installed:
 
 ```sh
 docker compose -f docker-compose.e2e.yaml ps
@@ -91,10 +91,14 @@ docker compose -f docker-compose.e2e.yaml down
 4. Reload restores the signed-in user, uses exactly one refresh request, and rotates the HttpOnly/SameSite Strict refresh cookie.
 5. Logout returns 204, removes the refresh cookie, signs out another open tab without a reload, and prevents protected access after navigation and reload.
 6. A fresh unauthenticated browser context is redirected from `/` to `/login`.
+7. Alice and Bob sign in using two pages in the same browser context. Bob's login invalidates Alice's tab, and Alice's pending protected request is never retried as Bob. Bob's session remains valid after reload; no invalidation calls logout.
+8. A rejected access token triggers same-user refresh, a `/me` identity check, and one safe retry; reload and a second page still restore that user.
+
+The session-change tests replace only the first protected request's Authorization header with an invalid token to trigger a real 401. Refresh, identity lookup, retry, cookies, and all API responses use the real service.
 
 Every test has its own browser context and unique UUID-based user credentials; no test relies on an account or browser state created by another test. Setup uses the UI, not direct database writes. There are no fixed sleeps: locators, response events, and Playwright assertions provide waiting.
 
-The production rate limiter stays unchanged: ten combined registration/login attempts per IP per fifteen minutes. This suite uses nine attempts on a fresh stack. One worker and zero retries make that budget deterministic. **Recreate the test stack between complete runs**, and do not use `--repeat-each` or add browser projects without planning for the rate limit. The database is discarded with the stack, so no development records are ever cleaned up.
+The production rate limiter stays unchanged: ten combined registration/login attempts per IP per fifteen minutes. The original `auth.spec.ts` uses nine attempts and `session-change.spec.ts` uses six. The per-file test-service restart clears the process-local limiter between these groups, so the default full run works without weakening production limits. One worker and zero retries make that budget deterministic. **Recreate the test stack between complete runs**, and do not use `--repeat-each` or add browser projects without planning for the rate limit. The database is discarded with the stack, so no development records are ever cleaned up.
 
 ## Credentials and diagnostics
 
@@ -104,6 +108,6 @@ The safe reporter intentionally omits raw failure payloads. A failing test title
 
 ## Verified run
 
-On 2026-10-23, all six Chromium scenarios passed against this Docker stack: 6 passed, 0 failed, 0 skipped. Frontend lint, E2E TypeScript checking, the production build, and all fourteen frontend store tests (including cross-tab logout race coverage) also passed. The build retains its existing advisory about the main JavaScript chunk exceeding 500 kB. The isolated stack was removed afterward; the development containers were left running.
+On 2026-10-23, the default `npm run test:e2e` command passed twice consecutively against the same Docker stack: each run had 8 passed, 0 failed, 0 skipped. Per-file auth-service restarts reset the test rate limiter automatically. Frontend lint, E2E TypeScript checking, the production build, and all eighteen frontend store tests (including identity mismatch and cross-tab login/logout race coverage) also passed. The build retains its existing advisory about the main JavaScript chunk exceeding 500 kB. The isolated stack was removed afterward; the development containers were left running.
 
 Playwright references: [test configuration](https://playwright.dev/docs/test-configuration) and [CLI commands](https://playwright.dev/docs/test-cli).

@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { resetRateLimit } from './resetRateLimit.ts'
+
+test.beforeAll(resetRateLimit)
 
 function uniqueUser() {
   return {
