@@ -8,6 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "node --experimental-strip-types --test tests/authStore.test.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:list": "playwright test --list --reporter=list",
+    "typecheck:e2e": "tsc -p tsconfig.e2e.json",
     "test:integration": "../auth-service/node_modules/.bin/tsx --test tests/auth-service.integration.mjs",
     "preview": "vite preview"
   },
@@ -22,6 +25,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.1",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

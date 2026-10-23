@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "composite": false,
+    "types": ["node"],
+    "strict": true
+  },
+  "include": ["playwright.config.ts", "vite.e2e.config.ts", "tests/e2e/**/*.ts"]
+}

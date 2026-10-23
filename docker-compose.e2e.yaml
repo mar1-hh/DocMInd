@@ -1,0 +1,54 @@
+# Standalone stack: never combine this file with docker-compose.yaml.
+name: docmind-auth-e2e
+services:
+  mongodb:
+    image: mongo:8
+    tmpfs:
+      - /data/db
+      - /data/configdb
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  auth-service:
+    build: ./auth-service
+    environment:
+      NODE_ENV: test
+      PORT: "3001"
+      MONGO_URI: mongodb://mongodb:27017/docmind_auth_e2e
+      JWT_ACCESS_SECRET: docmind-isolated-e2e-signing-key-not-for-production
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/health"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.e2e
+    ports:
+      - "127.0.0.1:4173:4173"
+    depends_on:
+      nginx:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4173/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
