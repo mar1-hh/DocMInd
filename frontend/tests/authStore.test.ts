@@ -348,3 +348,99 @@ for (const phase of ['refresh', 'identity lookup'] as const) {
     await assert.rejects(store.authenticatedRequest('/me'), /Please sign in/)
   })
 }
+
+test('logout completion invalidates a reloaded tab that restored before server cleanup', { timeout: 5000 }, async (t) => {
+  const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
+  let lockQueue: Promise<unknown> = Promise.resolve()
+  let holdingLock = false
+  let lockRequests = 0
+  const bQueued = deferred()
+  // Model the browser's FIFO lock on Node versions without Web Locks as well.
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { locks: {
+    request(_name: string, operation: () => Promise<unknown>) {
+      if (++lockRequests === 3) bQueued.resolve() // A login, A refresh, then B restoration.
+      const pending = lockQueue.then(async () => {
+        holdingLock = true
+        try { return await operation() } finally { holdingLock = false }
+      })
+      lockQueue = pending.catch(() => undefined)
+      return pending
+    },
+  } } })
+  const aRefreshStarted = deferred()
+  const finishARefresh = deferred()
+  const cleanupStarted = deferred()
+  const finishCleanup = deferred()
+  const initialBroadcast = deferred()
+  const calls: string[] = []
+  const channelName = 'docmind-test-logout-completion'
+  const aChannel = new BroadcastChannel(channelName)
+  const observer = new BroadcastChannel(channelName)
+  let logoutBroadcasts = 0
+  const post = aChannel.postMessage.bind(aChannel)
+  t.mock.method(aChannel, 'postMessage', (message: { type: string }) => {
+    if (message.type === 'logout') {
+      ++logoutBroadcasts
+      if (logoutBroadcasts === 2) assert.equal(holdingLock, true, 'completion must be posted before releasing the cookie lock')
+    }
+    post(message)
+  })
+  observer.onmessage = ({ data }) => { if (data.type === 'logout') initialBroadcast.resolve() }
+  const a = createAuthStore(async (url) => {
+    if (url === '/api/auth/login') return json({ accesstoken: 'old-token', user })
+    if (url === '/api/auth/protected') return json({ message: 'Expired' }, 401)
+    calls.push(String(url))
+    if (url === '/api/auth/refresh') {
+      aRefreshStarted.resolve()
+      await finishARefresh.promise
+      return json({ accessToken: 'late-a-token' })
+    }
+    assert.equal(url, '/api/auth/logout')
+    cleanupStarted.resolve()
+    await finishCleanup.promise
+    return new Response(null, { status: 204 })
+  }, () => aChannel)
+  t.after(() => {
+    finishARefresh.resolve()
+    finishCleanup.resolve()
+    a.dispose()
+    observer.close()
+    if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator)
+    else Reflect.deleteProperty(globalThis, 'navigator')
+  })
+  await a.login(input)
+  const aRequest = assert.rejects(a.authenticatedRequest('/protected'))
+  await aRefreshStarted.promise
+  const logout = a.logout()
+  assert.equal(a.getSnapshot().user, null)
+  await initialBroadcast.promise
+
+  // The reloaded tab missed the initial event and queues behind A's refresh,
+  // before A's locally serialized logout has requested the shared cookie lock.
+  const bChannel = new BroadcastChannel(channelName)
+  const bPost = t.mock.method(bChannel, 'postMessage')
+  const b = createAuthStore(async (url) => {
+    calls.push(String(url))
+    assert.notEqual(url, '/api/auth/logout', 'receiving a broadcast must not revoke another session')
+    return url === '/api/auth/refresh' ? json({ accessToken: 'b-token' }) : json({ user })
+  }, () => bChannel)
+  t.after(() => b.dispose())
+  const restored = b.restore()
+  await bQueued.promise
+  finishARefresh.resolve()
+  await Promise.all([aRequest, restored, cleanupStarted.promise])
+  assert.equal(b.getSnapshot().status, 'authenticated', 'B must overtake server cleanup to reproduce the race')
+  assert.deepEqual(calls, ['/api/auth/refresh', '/api/auth/refresh', '/api/auth/me', '/api/auth/logout'])
+  const invalidated = deferred()
+  b.subscribe(() => { if (b.getSnapshot().status === 'anonymous') invalidated.resolve() })
+  finishCleanup.resolve()
+  await logout
+  assert.equal(logoutBroadcasts, 2, 'successful server cleanup must broadcast logout completion')
+  await invalidated.promise
+  assert.equal(a.getSnapshot().status, 'anonymous')
+  assert.equal(b.getSnapshot().status, 'anonymous')
+  assert.equal(b.getSnapshot().user, null)
+  await assert.rejects(a.authenticatedRequest('/me'), /Please sign in/)
+  await assert.rejects(b.authenticatedRequest('/me'), /Please sign in/)
+  assert.equal(bPost.mock.callCount(), 0, 'receiving tabs must not rebroadcast logout')
+})

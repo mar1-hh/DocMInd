@@ -144,6 +144,9 @@ export function createAuthStore(
       logoutPromise = serialized(async () => {
         try {
           await request('/logout', jsonPost())
+          // A reloaded tab may have restored before this cleanup acquired the lock.
+          // Invalidate it again after revocation, while still holding the cookie lock.
+          channel?.postMessage({ type: 'logout' })
           publish({ ...state, loggingOut: false, logoutFailed: false, error: null })
         } catch {
           publish({ ...state, loggingOut: false, logoutFailed: true, error: 'You are signed out locally, but the server session could not be ended. Retry sign out before reloading.' })
