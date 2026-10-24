@@ -22,6 +22,22 @@ cd ..
 
 On Linux CI, use `npx playwright install --with-deps chromium` instead if browser system dependencies are missing.
 
+## Run with Make
+
+After installing the dependencies and Chromium above, run from the repository root:
+
+```sh
+make test-e2e
+```
+
+This creates a fresh isolated test stack, waits for health, runs all browser tests,
+and removes the test stack even when startup or tests fail. Failures return a nonzero
+exit status. Development containers and volumes are untouched.
+
+Use `make e2e-list` to list tests without Docker. For manual inspection, `make e2e-up`
+starts a fresh test stack and leaves it running; `make e2e-down` removes it.
+The commands below describe the same workflow without Make.
+
 ## Start a fresh isolated environment
 
 Run these commands from the repository root **before each full test run**, including reruns after a failure:
