@@ -1,3 +1,9 @@
+![DocMind login page](docs/screenshots/login.png)
+![DocMind registration page](docs/screenshots/register.png)
+
+# DocMind
+
+**Organize your documents. Ask questions. Find answers with context.**
 # DocMind
 
 **Organize your documents. Ask questions. Find answers with context.**
