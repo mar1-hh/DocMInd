@@ -28,6 +28,7 @@ export function createAuthStore(
   channelFactory: () => BroadcastChannel | null = createSessionChannel,
 ) {
   const request = createApi(fetcher)
+  const collectionsRequest = createApi(fetcher, '/api/collections')
   let state: AuthState = { status: 'restoring', user: null, error: null, loggingOut: false, logoutFailed: false }
   let accessToken: string | null = null
   let tokenVersion = 0
@@ -154,12 +155,13 @@ export function createAuthStore(
       }).finally(() => { logoutPromise = null })
       return logoutPromise
     },
-    async authenticatedRequest(path: string, init: RequestInit = {}) {
+    async authenticatedRequest(path: string, init: RequestInit = {}, service: 'auth' | 'collections' = 'auth') {
       const expected = revision
       const send = (token: string) => {
         const headers = new Headers(init.headers)
         headers.set('Authorization', `Bearer ${token}`)
-        return request(path, { ...init, headers })
+        const api = service === 'collections' ? collectionsRequest : request
+        return api(path, { ...init, headers })
       }
       if (!accessToken) throw new ApiError('Please sign in to continue.', 401)
       const originalToken = accessToken

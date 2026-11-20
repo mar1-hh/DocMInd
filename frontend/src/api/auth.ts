@@ -35,17 +35,17 @@ export function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Something went wrong. Please try again.'
 }
 
-export function createApi(fetcher: typeof fetch) {
+export function createApi(fetcher: typeof fetch, basePath: '/api/auth' | '/api/collections' = '/api/auth') {
   return async function request(path: string, init: RequestInit = {}): Promise<unknown> {
     let response: Response
     try {
-      response = await fetcher(`/api/auth${path}`, {
+      response = await fetcher(`${basePath}${path}`, {
         ...init,
         credentials: 'include',
         signal: init.signal ?? AbortSignal.timeout(15_000),
       })
     } catch {
-      throw new ApiError('Unable to reach the authentication service. Please try again.')
+      throw new ApiError('Unable to reach the service. Please try again.')
     }
     if (response.status === 204) return undefined
     const data: unknown = await response.json().catch(() => undefined)
@@ -60,7 +60,7 @@ export function createApi(fetcher: typeof fetch) {
       const fallback = response.status === 429
         ? 'Too many requests. Please try again later.'
         : response.status >= 500
-          ? 'The authentication service is unavailable. Please try again.'
+          ? 'The service is unavailable. Please try again.'
           : 'The request could not be completed. Please try again.'
       throw new ApiError(body?.message ?? body?.errors?.formErrors[0] ?? (Object.keys(fields).length ? 'Please check the highlighted fields.' : fallback), response.status, body?.code, fields)
     }
@@ -77,6 +77,6 @@ export function jsonPost(data?: unknown): RequestInit {
 
 export function parseResponse<T>(schema: z.ZodType<T>, value: unknown): T {
   const result = schema.safeParse(value)
-  if (!result.success) throw new ApiError('The authentication service returned an unexpected response. Please try again.')
+  if (!result.success) throw new ApiError('The service returned an unexpected response. Please try again.')
   return result.data
 }

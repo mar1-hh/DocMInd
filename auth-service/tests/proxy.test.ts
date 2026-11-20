@@ -52,14 +52,13 @@ describe('single NGINX proxy and authentication rate limiting', () => {
     assert.match(config, /proxy_set_header X-Real-IP \$remote_addr;/)
     assert.match(config, /proxy_set_header Forwarded "";/)
     assert.doesNotMatch(config, /\$proxy_add_x_forwarded_for|\$http_x_forwarded_for/)
-    for (const route of ['/api/auth/', '/health']) {
-      assert.ok(config.includes(`location ${route} {`))
-    }
-    // Location-level overrides would stop inheritance of the server headers.
+    assert.match(config, /upstream\s+auth_api\s*\{[^{}]*server\s+auth-service:3001\s+resolve;/)
+    // Check auth locations specifically. Other gateway upstreams have their own locations.
     const locations = config.match(/location\s+[^{}]+\{[^{}]*\}/g) ?? []
-    assert.equal(locations.length, 2)
-    for (const location of locations) {
-      assert.match(location, /proxy_pass http:\/\/auth-service:3001;/)
+    for (const route of ['/api/auth/', '/health']) {
+      const location = locations.find(block => block.startsWith(`location ${route} {`))
+      assert.ok(location, `Missing gateway location ${route}`)
+      assert.match(location, /proxy_pass http:\/\/auth_api;/)
       assert.doesNotMatch(location, /proxy_set_header/)
     }
   })

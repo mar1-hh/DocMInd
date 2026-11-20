@@ -21,7 +21,14 @@ writeFileSync(config, JSON.stringify({ services: {
       MONGO_URI: 'mongodb://mongodb:27017/docmind_gateway_test' },
     depends_on: ['mongodb'],
   },
-  nginx: { image: 'nginx:alpine', depends_on: ['auth-service'],
+  'document-service': {
+    build: resolve(root, '../document-service'),
+    environment: { PORT: '3002', JWT_ACCESS_SECRET: 'disposable-gateway-test-secret',
+      MONGO_URI: 'mongodb://mongodb:27017/docmind_documents_test' },
+    depends_on: ['mongodb'],
+  },
+  frontend: { build: resolve(root, '../frontend') },
+  nginx: { image: 'nginx:alpine', depends_on: ['auth-service', 'document-service', 'frontend'],
     volumes: [`${resolve(root, '../nginx/nginx.conf')}:/etc/nginx/nginx.conf:ro`] },
   'client-a': { image, command: ['node', '-e', 'setInterval(() => {}, 1000)'] },
   'client-b': { image, command: ['node', '-e', 'setInterval(() => {}, 1000)'] },
@@ -45,7 +52,7 @@ try {
     import assert from 'node:assert/strict';
     let ready = false;
     for (let i = 0; i < 60; i++) {
-      try { if ((await fetch('http://nginx/health')).status === 200) { ready = true; break; } } catch {}
+      try { if ((await fetch('http://nginx/health')).ok && (await fetch('http://nginx/health/documents')).ok) { ready = true; break; } } catch {}
       await new Promise(resolve => setTimeout(resolve, 500));
     }
     assert.ok(ready, 'Gateway must become healthy');
@@ -73,6 +80,23 @@ try {
     const r1 = cookie(loggedIn);
     const access = (await loggedIn.json()).accesstoken;
     assert.equal((await fetch(base + 'me', { headers: { Authorization: 'Bearer ' + access } })).status, 200);
+    const collections = 'http://nginx/api/collections';
+    const headers = { Authorization: 'Bearer ' + access, 'Content-Type': 'application/json' };
+    assert.equal((await fetch(collections)).status, 401);
+    const created = await fetch(collections, { method: 'POST', headers, body: JSON.stringify({ name: 'Gateway test' }) });
+    assert.equal(created.status, 201);
+    const { collection } = await created.json();
+    const list = await fetch(collections + '?limit=1', { headers });
+    assert.equal(list.status, 200);
+    assert.equal((await list.json()).collections[0].id, collection.id);
+    const item = collections + '/' + collection.id;
+    assert.equal((await fetch(item, { headers })).status, 200);
+    const renamed = await fetch(item, { method: 'PATCH', headers, body: JSON.stringify({ name: 'Renamed' }) });
+    assert.equal(renamed.status, 200);
+    assert.equal((await renamed.json()).collection.name, 'Renamed');
+    assert.equal((await fetch(item, { method: 'DELETE', headers })).status, 204);
+    assert.equal((await fetch(item, { headers })).status, 404);
+    console.log('PASS: collections CRUD through the gateway with an auth-service token');
     const refreshed = await post('refresh', {}, r1);
     assert.equal(refreshed.status, 200);
     const r2 = cookie(refreshed);

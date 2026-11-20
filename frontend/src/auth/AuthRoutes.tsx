@@ -21,13 +21,13 @@ export function AuthBootstrap({ children }: { children: ReactNode }) {
 export function ProtectedRoute() {
   const { user } = useAuth()
   const location = useLocation()
-  return user ? <Outlet /> : <Navigate to="/login" state={{ from: location.pathname }} replace />
+  return user ? <Outlet /> : <Navigate to="/login" state={{ from: location.pathname + location.search + location.hash }} replace />
 }
 
 export function PublicRoute() {
   const { user } = useAuth()
   const location = useLocation()
   const from: unknown = location.state?.from
-  const destination = typeof from === 'string' && from.startsWith('/') && !from.startsWith('//') && from !== '/login' && from !== '/register' ? from : '/'
+  const destination = typeof from === 'string' && from.startsWith('/') && !from.startsWith('//') && from !== '/' && from !== '/login' && from !== '/register' ? from : '/collections'
   return user ? <Navigate to={destination} replace /> : <Outlet />
 }

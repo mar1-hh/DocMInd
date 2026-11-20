@@ -1,0 +1,66 @@
+.collections-workspace {
+  color: var(--mui-palette-text-primary);
+  background: var(--mui-palette-background-default);
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 218px minmax(0, 1fr);
+}
+.workspace-sidebar {
+  background: var(--mui-palette-background-paper);
+  border-right: 1px solid var(--mui-palette-divider);
+  padding: 32px 16px 20px;
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+.workspace-brand, .workspace-current, .workspace-account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.workspace-brand { padding: 0 9px; font-size: 24px; font-weight: 700; letter-spacing: -.045em; }
+.workspace-brand svg { font-size: 31px; color: var(--mui-palette-primary-main); }
+.workspace-current, .workspace-account { text-decoration: none; color: inherit; border-radius: 8px; }
+.workspace-current { padding: 11px 13px; font-size: 15px; font-weight: 600; color: var(--mui-palette-text-primary); background: rgba(var(--mui-palette-primary-mainChannel) / 0.13); }
+.workspace-current svg { font-size: 21px; }
+.workspace-account { border: 0; background: transparent; font-family: inherit; cursor: pointer; margin-top: auto; padding: 10px 8px; font-size: 14px; font-weight: 600; }
+.workspace-account:hover { background: var(--mui-palette-action-hover); }
+.workspace-account span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-account svg { margin-left: auto; font-size: 16px; flex-shrink: 0; }
+.collections-workspace :is(a, button):focus-visible { outline: 3px solid var(--mui-palette-primary-main); outline-offset: 2px; }
+.collections-main { width: 100%; max-width: 1480px; padding: clamp(28px, 4vw, 64px); margin-inline: auto; }
+.collections-heading { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--mui-palette-divider); padding-bottom: 24px; margin-bottom: 24px; }
+.collections-heading h1 { margin: 0; font-size: clamp(28px, 3vw, 40px); letter-spacing: -.045em; line-height: 1.2; }
+.workspace-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.collections-workspace .MuiButton-root { min-height: 42px; }
+.collections-sort { color: var(--mui-palette-text-secondary); font-size: 13px; margin-bottom: 12px; }
+.collections-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(min(255px, 100%), 1fr)); }
+.collection-card, .collections-empty { background: var(--mui-palette-background-paper); border: 1px solid var(--mui-palette-divider); border-radius: 12px; }
+.collection-card { padding: 20px 20px 12px; display: flex; flex-direction: column; min-width: 0; }
+.card-folder, .empty-folder { display: grid; place-items: center; background: rgba(var(--mui-palette-primary-mainChannel) / 0.10); color: var(--mui-palette-primary-main); }
+.card-folder { height: 40px; width: 42px; border-radius: 9px; font-size: 26px; }
+.collection-card h2, .collections-empty h2 { margin: 16px 0 6px; font-size: 19px; line-height: 1.35; letter-spacing: -.025em; overflow-wrap: anywhere; }
+.collection-card p, .collections-empty p { color: var(--mui-palette-text-secondary); font-size: 14px; line-height: 1.55; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.collection-card footer { display: flex; justify-content: space-between; align-items: center; gap: 4px; margin-top: auto; padding-top: 18px; }
+.collection-card time, .collections-pages span { color: var(--mui-palette-text-secondary); font-size: 12px; }
+.collection-actions { display: flex; gap: 2px; }
+.collection-actions button { width: 36px; height: 36px; font-size: 17px; }
+.collections-empty { padding: clamp(36px, 7vw, 96px) 20px; text-align: center; }
+.empty-folder { width: 66px; height: 66px; border-radius: 18px; margin-inline: auto; font-size: 38px; }
+.collections-empty button { margin-top: 22px; }
+.collections-pages { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+@media (max-width: 700px) {
+  .collections-workspace { display: block; }
+  .workspace-sidebar { position: static; height: auto; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; border-right: 0; border-bottom: 1px solid var(--mui-palette-divider); padding: 14px 18px; }
+  .workspace-brand { padding: 0; font-size: 21px; }
+  .workspace-sidebar nav { grid-column: 1 / -1; grid-row: 2; }
+  .workspace-current { display: inline-flex; padding: 7px 12px; }
+  .workspace-account { margin: 0; padding: 2px; }
+  .workspace-account span, .workspace-account svg { display: none; }
+  .collections-main { padding: 28px 18px; }
+  .collections-heading { gap: 12px; margin-bottom: 18px; padding-bottom: 18px; }
+  .collections-pages { justify-content: center; }
+}

@@ -25,7 +25,7 @@ async function login(page: Page, user: ReturnType<typeof uniqueUser>) {
   const response = page.waitForResponse((response) => response.url().endsWith('/api/auth/login') && response.request().method() === 'POST')
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   expect((await response).status()).toBe(200)
-  await expect(page.getByRole('heading', { name: `Welcome, ${user.name}`, exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: `Account for ${user.name}`, exact: true })).toBeVisible()
 }
 
 test('cross-tab account change invalidates Alice without replaying her pending request as Bob', async ({ page, context }) => {
@@ -55,7 +55,8 @@ test('cross-tab account change invalidates Alice without replaying her pending r
     await route.continue({ headers: { ...route.request().headers(), authorization: 'Bearer expired-test-token' } })
   })
   try {
-    await page.getByRole('button', { name: 'Check session', exact: true }).click()
+    await page.getByRole('button', { name: /^Account for / }).click()
+    await page.getByRole('menuitem', { name: 'Check session', exact: true }).click()
     await intercepted
     await login(otherTab, bob)
     await expect(page).toHaveURL(/\/login$/)
@@ -65,12 +66,13 @@ test('cross-tab account change invalidates Alice without replaying her pending r
     // Drain the route handler as well as its response before checking request counts.
     await page.unrouteAll({ behavior: 'wait' })
     await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible()
-    await expect(page.getByText('Signed in as', { exact: false })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /^Account for / })).toHaveCount(0)
     expect(meCalls).toBe(1)
     expect(logouts).toBe(0)
     await otherTab.reload()
-    await expect(otherTab.getByRole('heading', { name: 'Welcome, Bob', exact: true })).toBeVisible()
-    await otherTab.getByRole('button', { name: 'Check session', exact: true }).click()
+    await expect(otherTab.getByRole('button', { name: 'Account for Bob', exact: true })).toBeVisible()
+    await otherTab.getByRole('button', { name: /^Account for / }).click()
+  await otherTab.getByRole('menuitem', { name: 'Check session', exact: true }).click()
     await expect(otherTab.getByRole('status')).toHaveText('Your session is active.')
   } finally {
     release()
@@ -94,14 +96,15 @@ test('same-user refresh retries safely and session restoration still works', asy
       await route.continue()
     }
   })
-  await page.getByRole('button', { name: 'Check session', exact: true }).click()
+  await page.getByRole('button', { name: /^Account for / }).click()
+  await page.getByRole('menuitem', { name: 'Check session', exact: true }).click()
   await expect(page.getByRole('status')).toHaveText('Your session is active.')
   expect(meCalls).toBe(3) // Original rejection, refreshed /me identity check, original request retry.
   expect(refreshCalls).toBe(1)
   await page.reload()
-  await expect(page.getByRole('heading', { name: 'Welcome, Alice', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Account for Alice', exact: true })).toBeVisible()
   const otherTab = await context.newPage()
   await otherTab.goto('/')
-  await expect(otherTab.getByRole('heading', { name: 'Welcome, Alice', exact: true })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Welcome, Alice', exact: true })).toBeVisible()
+  await expect(otherTab.getByRole('button', { name: 'Account for Alice', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Account for Alice', exact: true })).toBeVisible()
 })

@@ -20,6 +20,17 @@ services:
     depends_on:
       - mongodb
 
+  document-service:
+    build: ./document-service
+    restart: unless-stopped
+    env_file:
+      - ./auth-service/.env
+    environment:
+      MONGO_URI: mongodb://mongodb:27017/docmind_documents
+      PORT: "3002"
+    depends_on:
+      - mongodb
+
   nginx:
     image: nginx:alpine
     container_name: docmind-nginx
@@ -30,6 +41,7 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - auth-service
+      - document-service
       - frontend
   
   frontend:

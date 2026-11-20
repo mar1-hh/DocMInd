@@ -1,11 +1,20 @@
 import { createTheme } from '@mui/material/styles'
 
 export const theme = createTheme({
-  palette: {
-    primary: { main: '#287eff', dark: '#1664d8' },
-    background: { default: '#e9edf3', paper: '#ffffff' },
-    text: { primary: '#0b1020', secondary: '#5d7093' },
-    divider: '#dce3ed',
+  cssVariables: { colorSchemeSelector: 'class' },
+  colorSchemes: {
+    light: { palette: {
+      primary: { main: '#287eff', dark: '#1664d8', contrastText: '#fff' },
+      background: { default: '#e9edf3', paper: '#fff' },
+      text: { primary: '#0b1020', secondary: '#5d7093' },
+      divider: '#dce3ed',
+    } },
+    dark: { palette: {
+      primary: { main: '#83b5ff', dark: '#599cfa', contrastText: '#0b172b' },
+      background: { default: '#0d192a', paper: '#162942' },
+      text: { primary: '#eff5ff', secondary: '#b4c6df' },
+      divider: '#3b516d',
+    } },
   },
   typography: {
     fontFamily: 'Arial, Helvetica, sans-serif',
@@ -15,10 +24,13 @@ export const theme = createTheme({
   },
   shape: { borderRadius: 8 },
   components: {
+    MuiButtonBase: { styleOverrides: {
+      root: { '&.Mui-focusVisible': { outline: '3px solid var(--mui-palette-primary-main)', outlineOffset: 2 } },
+    } },
     MuiButton: { defaultProps: { disableElevation: true }, styleOverrides: { root: { minHeight: 54 } } },
     MuiTextField: { defaultProps: { fullWidth: true, variant: 'outlined' } },
     MuiOutlinedInput: { styleOverrides: {
-      root: { backgroundColor: '#fff', '& .MuiOutlinedInput-notchedOutline': { borderColor: '#b9c6db' } },
+      root: { backgroundColor: 'var(--mui-palette-background-paper)', '& fieldset': { borderColor: 'var(--mui-palette-divider)' } },
       input: { padding: '18px 16px' },
     } },
     MuiLink: { defaultProps: { underline: 'hover' }, styleOverrides: { root: { fontWeight: 600 } } },

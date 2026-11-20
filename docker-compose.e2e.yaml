@@ -26,6 +26,21 @@ services:
       interval: 2s
       timeout: 5s
       retries: 30
+  document-service:
+    build: ./document-service
+    environment:
+      NODE_ENV: test
+      PORT: "3002"
+      MONGO_URI: mongodb://mongodb:27017/docmind_documents_e2e
+      JWT_ACCESS_SECRET: docmind-isolated-e2e-signing-key-not-for-production
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
   nginx:
     image: nginx:alpine
     volumes:
@@ -33,6 +48,10 @@ services:
     depends_on:
       auth-service:
         condition: service_healthy
+      document-service:
+        condition: service_healthy
+      frontend:
+        condition: service_started
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/health"]
       interval: 2s
@@ -44,9 +63,6 @@ services:
       dockerfile: Dockerfile.e2e
     ports:
       - "127.0.0.1:4173:4173"
-    depends_on:
-      nginx:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4173/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 2s
