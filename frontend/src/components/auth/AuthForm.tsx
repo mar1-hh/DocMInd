@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom'
-import { Alert, Box, Button, Divider, Link, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, Link, Stack, TextField, Typography } from '@mui/material'
 import { loginSchema, registerSchema } from '../../validation/auth'
 import { PasswordField } from './PasswordField'
 import { authStore } from '../../auth/authStore'
@@ -67,8 +67,8 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
   }
   return (
     <>
-      <Typography component="h1" variant="h1" sx={{ fontSize: { xs: '1.8rem', sm: '2.2rem' } }}>{register ? 'Create your account' : 'Welcome back'}</Typography>
-      <Typography color="text.secondary" sx={{ mt: 1.25, mb: 4, fontSize: { xs: 16, sm: 19 } }}>{register ? 'Start organizing your documents.' : 'Sign in to your DocMind account.'}</Typography>
+      <Typography component="h1" variant="h1" className="auth-title">{register ? 'Create your account' : 'Welcome back'}</Typography>
+      <Typography color="text.secondary" sx={{ mt: 1, mb: 3.5, fontSize: 17 }}>{register ? 'Start organizing your documents.' : 'Sign in to your DocMind account.'}</Typography>
       <Box component="form" noValidate onSubmit={submit}>
         <Box component="fieldset" disabled={disabled} sx={{ border: 0, m: 0, p: 0, minWidth: 0 }} aria-busy={disabled}>
         <Stack spacing={register ? 2.5 : 3}>
@@ -83,8 +83,8 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
         </Stack>
         </Box>
       </Box>
-      <Divider sx={{ my: 3.5 }} />
-      <Typography color="text.secondary" sx={{ textAlign: 'center', fontSize: 14, lineHeight: 1.8 }}>
+
+      <Typography color="text.secondary" sx={{ textAlign: 'center', mt: 2.5, fontSize: 15, lineHeight: 1.6 }}>
         {register ? 'Already have an account? ' : 'New to DocMind? '}
         {pending ? (register ? 'Sign in.' : 'Create an account.') : <Link component={RouterLink} to={register ? '/login' : '/register'} state={{ from: location.state?.from }}>{register ? 'Sign in.' : 'Create an account.'}</Link>}
       </Typography>

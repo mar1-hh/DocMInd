@@ -1,5 +1,5 @@
 
-.PHONY: help build up down start stop restart logs ps clean rebuild fclean test-e2e e2e-up e2e-down e2e-list
+.PHONY: help build up down start stop restart logs ps clean rebuild fclean test-e2e test-chat-live e2e-up e2e-down e2e-list
 
 COMPOSE = docker compose
 E2E_COMPOSE = docker compose -f docker-compose.e2e.yaml
@@ -17,6 +17,7 @@ help:
 	@echo "  make clean    - Remove containers and local images"
 	@echo "  make rebuild  - Rebuild images without cache"
 	@echo "  make test-e2e - Start isolated stack, run browser tests, and clean up"
+	@echo "  make test-chat-live - Test collection chat with your local Gemini key"
 	@echo "  make e2e-up   - Build and start a fresh isolated test stack"
 	@echo "  make e2e-down - Stop and remove only the test stack"
 	@echo "  make e2e-list - List browser tests without starting Docker"
@@ -58,16 +59,23 @@ fclean:
 # Always clean up the isolated stack, including after startup or test failures.
 test-e2e:
 	@set -eu; \
-	trap '$(E2E_COMPOSE) down' EXIT; \
+	trap '$(E2E_COMPOSE) down --volumes' EXIT; \
 	$(MAKE) e2e-up; \
+	$(E2E_COMPOSE) exec -T chatbot-service python -m unittest discover -s /app/tests; \
 	npm --prefix frontend run test:e2e
 
+test-chat-live:
+	@set -eu; \
+	trap '$(E2E_COMPOSE) down --volumes' EXIT; \
+	$(E2E_COMPOSE) -f docker-compose.chat-live.yaml up -d --build --wait --wait-timeout 180; \
+	npm --prefix frontend run test:e2e -- chat.spec.ts
+
 e2e-up:
-	$(E2E_COMPOSE) down
+	$(E2E_COMPOSE) down --volumes
 	$(E2E_COMPOSE) up --build --force-recreate --wait --wait-timeout 180
 
 e2e-down:
-	$(E2E_COMPOSE) down
+	$(E2E_COMPOSE) down --volumes
 
 e2e-list:
 	npm --prefix frontend run test:e2e:list

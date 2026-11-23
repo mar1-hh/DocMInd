@@ -1,0 +1,6 @@
+# Override only the Gemini transport in the isolated E2E stack.
+services:
+  chatbot-service:
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "3003"]
+    env_file:
+      - ./chatbot-service/.env

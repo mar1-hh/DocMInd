@@ -47,7 +47,7 @@ test('successful login and the legacy root open Collections', async ({ page }) =
   const user = uniqueUser()
   await register(page, user)
   await login(page, user)
-  await expect(page.getByRole('heading', { name: 'Your collections' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Collections', exact: true })).toBeVisible()
   await page.goto('/')
   await expect(page).toHaveURL(/\/collections$/)
   await page.getByRole('button', { name: /^Account for / }).click()

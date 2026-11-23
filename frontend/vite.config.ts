@@ -7,6 +7,7 @@ export default defineConfig({
   server: {
     proxy: {
       // Preserve /api/auth and its HttpOnly cookie path through the existing Nginx gateway.
+      '/api/chat': { target: 'http://127.0.0.1:8080', changeOrigin: true },
       '/api/collections': { target: 'http://127.0.0.1:8080', changeOrigin: true },
       '/api/auth': { target: 'http://127.0.0.1:8080', changeOrigin: true },
     },

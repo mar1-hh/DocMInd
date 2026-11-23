@@ -1,19 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Alert, Button, FormControlLabel, Switch, IconButton, LinearProgress, Snackbar, Tooltip } from '@mui/material'
-import { useColorScheme } from '@mui/material/styles'
+import { Alert, Button, IconButton, LinearProgress, Snackbar, Tooltip } from '@mui/material'
 import { listCollections, type CollectionList } from '../api/collections'
 import { errorMessage } from '../api/auth'
 import { useAuth } from '../auth/useAuth'
-import { AccountMenu } from '../components/collections/AccountMenu'
+import { WorkspaceLayout } from '../components/collections/WorkspaceLayout'
 import { CollectionDialog, type Action } from '../components/collections/CollectionDialog'
 import { WorkspaceIcon } from '../components/collections/WorkspaceIcon'
-import './collections.css'
 
-const dateFormat = new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+import { Status, Timestamp } from '../components/collections/Status'
 
-function Workspace() {
-  const { mode, setMode } = useColorScheme()
+function Workspace({ recentChats }: { recentChats: boolean }) {
   const [query, setQuery] = useState({ page: 1 })
   const [result, setResult] = useState<{ query: typeof query; data?: CollectionList; error?: string }>()
   const [action, setAction] = useState<Action | null>(null)
@@ -43,6 +40,12 @@ function Workspace() {
     return () => controller.abort()
   }, [query])
 
+  useEffect(() => {
+    if (loading || !data || !(data.collections.some(c => c.status === 'processing') || data.recent.some(d => ['indexing', 'pending'].includes(d.status)))) return
+    const timer = window.setTimeout(() => setQuery({ page: query.page }), 4000)
+    return () => window.clearTimeout(timer)
+  }, [loading, data, query.page])
+
   function saved() {
     if (!action) return
     let page = query.page
@@ -56,66 +59,64 @@ function Workspace() {
     setQuery({ page })
   }
 
-  return <div className="collections-workspace">
-    <aside className="workspace-sidebar">
-      <div className="workspace-brand"><WorkspaceIcon name="book" />DocMind</div>
-      <nav aria-label="Workspace"><Link to="/collections" className="workspace-current" aria-current="page">
-        <WorkspaceIcon name="folder" />Collections
-      </Link></nav>
-      <AccountMenu />
-    </aside>
-    <main className="collections-main">
-      <header className="collections-heading"><h1>Your collections</h1>
-        <div className="workspace-controls">
-          <FormControlLabel label="Dark mode" control={<Switch size="small" checked={mode === 'dark'}
-            onChange={event => setMode(event.target.checked ? 'dark' : 'light')} slotProps={{ input: { role: 'switch' } }} />} />
-          <Button ref={newButton} variant="contained" startIcon={<WorkspaceIcon name="plus" />}
-          onClick={() => setAction({ kind: 'create' })}>New collection</Button>
-        </div>
-      </header>
-      <section aria-label="Collection list" aria-busy={loading}>
-        {loading && <LinearProgress aria-label="Loading collections" />}
-        {error && <Alert severity="error" action={<Button onClick={() => setQuery({ page: query.page })}>Retry</Button>}>{error}</Alert>}
-        {data && data.collections.length === 0 && <div className="collections-empty">
-          <span className="empty-folder"><WorkspaceIcon name="folder" /></span>
-          <h2>No collections yet</h2>
-          <p>Create a collection for a project or subject.</p>
-          <Button variant="outlined" onClick={() => setAction({ kind: 'create' })}>Create your first collection</Button>
-        </div>}
-        {!!data?.collections.length && <>
-          <div className="collections-sort">Newest first</div>
-          <div className="collections-grid">{data.collections.map(item =>
-            <article key={item.id} className="collection-card" aria-labelledby={`title-${item.id}`}>
-              <span className="card-folder"><WorkspaceIcon name="folder" /></span>
-              <h2 id={`title-${item.id}`}>{item.name}</h2>
-              {item.description && <p>{item.description}</p>}
-              <footer><time dateTime={item.createdAt}>Created {dateFormat.format(new Date(item.createdAt))}</time>
-                <div className="collection-actions">{(['edit', 'delete'] as const).map(kind => {
-                  const label = kind === 'edit' ? 'Edit' : 'Delete'
-                  return <Tooltip title={label} key={kind}><IconButton size="small" aria-label={`${label} ${item.name}`}
-                    onClick={() => setAction({ kind, collection: item })}><WorkspaceIcon name={kind === 'edit' ? 'edit' : 'trash'} /></IconButton></Tooltip>
-                })}</div>
-              </footer>
-            </article>
-          )}</div>
-          {(query.page > 1 || data.hasMore) && <nav className="collections-pages" aria-label="Collection pages">
-            <Button disabled={loading || query.page === 1} startIcon={<WorkspaceIcon name="previous" />}
-              onClick={() => setQuery({ page: query.page - 1 })}>Previous</Button>
-            <span aria-live="polite">Page {query.page}</span>
-            <Button disabled={loading || !data.hasMore || query.page >= 10000} endIcon={<WorkspaceIcon name="next" />}
-              onClick={() => setQuery({ page: query.page + 1 })}>Next</Button>
-          </nav>}
-        </>}
-      </section>
-    </main>
+  if (recentChats) return <WorkspaceLayout title="Recent chats" intro="Return to the latest conversation in each collection.">
+    {loading && <LinearProgress aria-label="Loading recent chats" />}
+    {error && <Alert severity="error" action={<Button onClick={() => setQuery({ page: 1 })}>Retry</Button>}>{error}</Alert>}
+    {data && (data.chats.length ? data.chats.map(chat => <Link className="recent-chat-row" key={chat.id} to={'/collections/' + chat.id}>
+      <strong>{chat.name}</strong><em>“{chat.question}”</em><Timestamp value={chat.at} />
+    </Link>) : <p>No questions yet. Open a collection to start a chat.</p>)}
+  </WorkspaceLayout>
+  return <WorkspaceLayout title="Collections" intro="Group documents by subject, then ask questions and check every answer against its source page." action={
+    <Button ref={newButton} variant="contained" onClick={() => setAction({ kind: 'create' })}>New collection</Button>
+  }>
+    <section aria-label="Collection list" aria-busy={loading}>
+      {loading && <LinearProgress aria-label="Loading collections" />}
+      {error && <Alert severity="error" action={<Button onClick={() => setQuery({ page: query.page })}>Retry</Button>}>{error}</Alert>}
+      {data && data.collections.length === 0 && <div className="collections-empty">
+        <span className="empty-folder"><WorkspaceIcon name="folder" /></span>
+        <h2>No collections yet</h2>
+        <p>Create a collection for a project or subject.</p>
+        <Button variant="outlined" onClick={() => setAction({ kind: 'create' })}>Create your first collection</Button>
+      </div>}
+      {!!data?.collections.length && <>
+        <div className="collection-rows">{data.collections.map(item =>
+          <article key={item.id} className="collection-row" aria-labelledby={'title-' + item.id}>
+            <div><h2 id={'title-' + item.id}><Link to={'/collections/' + item.id}>{item.name}</Link></h2>
+              <span>{item.count} {item.count === 1 ? 'document' : 'documents'}</span></div>
+            <div className="last-question">{item.latestChat ? <><em>“{item.latestChat.question}”</em><Timestamp value={item.latestChat.at} /></>
+              : <>{item.description && <p>{item.description}</p>}<small>Created <Timestamp value={item.createdAt} /></small></>}</div>
+            <Status value={item.status} />
+            <div className="row-tools">{(['edit', 'delete'] as const).map(kind => {
+              const label = kind === 'edit' ? 'Edit' : 'Delete'
+              return <Tooltip title={label} key={kind}><IconButton size="small" aria-label={label + ' ' + item.name}
+                onClick={() => setAction({ kind, collection: item })}><WorkspaceIcon name={kind === 'edit' ? 'edit' : 'trash'} /></IconButton></Tooltip>
+            })}</div>
+          </article>
+        )}</div>
+        {(query.page > 1 || data.hasMore) && <nav className="collections-pages" aria-label="Collection pages">
+          <Button disabled={loading || query.page === 1} startIcon={<WorkspaceIcon name="previous" />}
+            onClick={() => setQuery({ page: query.page - 1 })}>Previous</Button>
+          <span aria-live="polite">Page {query.page}</span>
+          <Button disabled={loading || !data.hasMore || query.page >= 10000} endIcon={<WorkspaceIcon name="next" />}
+            onClick={() => setQuery({ page: query.page + 1 })}>Next</Button>
+        </nav>}
+      </>}
+    </section>
+    {data && <section className="recent-files" aria-labelledby="recent-heading"><h2 id="recent-heading">Recently added</h2>
+      {data.recent.length ? data.recent.map(file => <div key={file.id} className="recent-file">
+        <Link className="file-link" to={`/collections/${file.collectionId}/documents/${file.id}/view`}><WorkspaceIcon name="file" />{file.filename}</Link>
+        <Link aria-label={'Open collection ' + file.collectionName} to={'/collections/' + file.collectionId}>{file.collectionName}</Link>
+        <Status value={file.status} /><Timestamp value={file.uploadedAt} />
+      </div>) : <p>Uploaded PDFs will appear here.</p>}
+    </section>}
     {action && <CollectionDialog action={action} onClose={() => setAction(null)} onSaved={saved} />}
     <Snackbar open={!!notice} autoHideDuration={4500} onClose={() => setNotice('')}>
       <Alert severity="success" role="status" onClose={() => setNotice('')}>{notice}</Alert>
     </Snackbar>
-  </div>
+  </WorkspaceLayout>
 }
 
-export function CollectionsPage() {
+export function CollectionsPage({ recentChats = false }: { recentChats?: boolean }) {
   const { user } = useAuth()
-  return user && <Workspace key={user.id} />
+  return user && <Workspace key={user.id + String(recentChats)} recentChats={recentChats} />
 }

@@ -35,7 +35,7 @@ export function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Something went wrong. Please try again.'
 }
 
-export function createApi(fetcher: typeof fetch, basePath: '/api/auth' | '/api/collections' = '/api/auth') {
+export function createApi(fetcher: typeof fetch, basePath: '/api/auth' | '/api/collections' | '/api/chat' = '/api/auth') {
   return async function request(path: string, init: RequestInit = {}): Promise<unknown> {
     let response: Response
     try {
@@ -48,6 +48,9 @@ export function createApi(fetcher: typeof fetch, basePath: '/api/auth' | '/api/c
       throw new ApiError('Unable to reach the service. Please try again.')
     }
     if (response.status === 204) return undefined
+    if (response.ok && response.headers.get('content-type')?.split(';')[0] === 'application/pdf') {
+      return response.blob()
+    }
     const data: unknown = await response.json().catch(() => undefined)
     if (!response.ok) {
       const parsed = errorSchema.safeParse(data)

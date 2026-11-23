@@ -33,11 +33,31 @@ services:
       PORT: "3002"
       MONGO_URI: mongodb://mongodb:27017/docmind_documents_e2e
       JWT_ACCESS_SECRET: docmind-isolated-e2e-signing-key-not-for-production
+      CHATBOT_SERVICE_URL: http://chatbot-service:3003
+      PDF_STORAGE_DIR: /data/pdfs
+    volumes:
+      - e2e_pdfs:/data/pdfs
     depends_on:
       mongodb:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  chatbot-service:
+    build: ./chatbot-service
+    command: ["uvicorn", "tests.provider_fixture:app", "--host", "0.0.0.0", "--port", "3003"]
+    volumes:
+      - ./chatbot-service/tests:/app/tests:ro
+    environment:
+      MONGO_URI: mongodb://mongodb:27017/docmind_documents_e2e
+      DOCUMENT_SERVICE_URL: http://document-service:3002
+    depends_on:
+      document-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3003/health')"]
       interval: 2s
       timeout: 5s
       retries: 30
@@ -68,3 +88,5 @@ services:
       interval: 2s
       timeout: 5s
       retries: 30
+volumes:
+  e2e_pdfs:

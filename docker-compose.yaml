@@ -28,8 +28,24 @@ services:
     environment:
       MONGO_URI: mongodb://mongodb:27017/docmind_documents
       PORT: "3002"
+      CHATBOT_SERVICE_URL: http://chatbot-service:3003
+      PDF_STORAGE_DIR: /data/pdfs
+    volumes:
+      - document_pdfs:/data/pdfs
     depends_on:
       - mongodb
+
+  chatbot-service:
+    build: ./chatbot-service
+    restart: unless-stopped
+    env_file:
+      - path: ./chatbot-service/.env
+        required: false
+    environment:
+      MONGO_URI: mongodb://mongodb:27017/docmind_documents
+      DOCUMENT_SERVICE_URL: http://document-service:3002
+    depends_on:
+      - document-service
 
   nginx:
     image: nginx:alpine
@@ -43,6 +59,7 @@ services:
       - auth-service
       - document-service
       - frontend
+      - chatbot-service
   
   frontend:
     build: ./frontend
@@ -54,3 +71,4 @@ services:
 
 volumes:
   mongodb_data:
+  document_pdfs:

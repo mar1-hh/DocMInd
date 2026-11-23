@@ -3,7 +3,6 @@ import { Alert, Avatar, Divider, ListSubheader, Menu, MenuItem, Snackbar } from 
 import { authStore } from '../../auth/authStore'
 import { useAuth } from '../../auth/useAuth'
 import { errorMessage, meResponseSchema, parseResponse } from '../../api/auth'
-import { WorkspaceIcon } from './WorkspaceIcon'
 
 export function AccountMenu() {
   const { user } = useAuth()
@@ -29,8 +28,8 @@ export function AccountMenu() {
     <button type="button" className="workspace-account" aria-label={`Account for ${user.name}`}
       aria-haspopup="menu" aria-expanded={Boolean(anchor)} aria-controls={anchor ? 'account-menu' : undefined}
       onClick={event => setAnchor(event.currentTarget)}>
-      <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main', color: 'primary.contrastText', fontSize: 14 }}>{user.name.trim().slice(0, 1).toUpperCase()}</Avatar>
-      <span>{user.name}</span><WorkspaceIcon name="next" />
+      <Avatar sx={{ width: 42, height: 42, bgcolor: 'text.primary', color: 'background.paper', fontSize: 17 }}>{user.name.trim().slice(0, 1).toUpperCase()}</Avatar>
+      <span>{user.name}</span>
     </button>
     <Menu id="account-menu" anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)}
       slotProps={{ list: { 'aria-label': 'Account' } }}>

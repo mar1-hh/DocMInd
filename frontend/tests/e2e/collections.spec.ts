@@ -1,24 +1,12 @@
-import { randomUUID } from 'node:crypto'
-import { expect, test, type Page } from '@playwright/test'
+import { execFile } from 'node:child_process'
+import { readFile } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
+import { promisify } from 'node:util'
+import { signIn } from './signIn.ts'
+import { expect, test } from '@playwright/test'
 import { resetRateLimit } from './resetRateLimit.ts'
 
 test.beforeAll(resetRateLimit)
-
-async function signIn(page: Page) {
-  const email = `collections-${randomUUID()}@example.com`
-  const password = `Test!${randomUUID()}`
-  const registered = await page.request.post('/api/auth/register', { data: { name: 'Collection Tester', email, password } })
-  expect(registered.status()).toBe(201)
-  await page.goto('/collections')
-  await expect(page).toHaveURL(/\/login$/)
-  await page.getByLabel(/^Email\b/).fill(email)
-  await page.getByLabel(/^Password\b/).fill(password)
-  const login = page.waitForResponse(res => res.url().endsWith('/api/auth/login'))
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-  await expect(page).toHaveURL(/\/collections$/)
-  await expect(page.getByRole('heading', { name: 'No collections yet' })).toBeVisible()
-  return (await (await login).json()).accesstoken as string
-}
 
 test('create, recover a failed edit, and confirm deletion through the gateway', async ({ page }) => {
   await signIn(page)
@@ -89,6 +77,8 @@ test('deleting the last collection on page two returns to page one', async ({ pa
 test('dashboard theme defaults to light and persists across restoration', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' })
   await signIn(page)
+  const settings = page.getByRole('button', { name: 'Settings' })
+  await settings.click()
   const toggle = page.getByRole('switch', { name: 'Dark mode' })
   await expect(toggle).not.toBeChecked()
   const surface = page.locator('.collections-workspace')
@@ -97,17 +87,83 @@ test('dashboard theme defaults to light and persists across restoration', async 
   await toggle.focus()
   await page.keyboard.press('Space')
   await expect(toggle).toBeChecked()
-  await expect(surface).not.toHaveCSS('background-color', light)
+  await expect(surface).toHaveCSS('background-color', 'rgb(0, 0, 0)')
+  await expect(page.getByRole('button', { name: 'New collection', includeHidden: true }))
+    .toHaveCSS('background-color', 'rgb(255, 224, 71)')
   await page.reload()
+  await settings.click()
   await expect(toggle).toBeChecked()
   await expect(surface).not.toHaveCSS('background-color', light)
+  await page.getByRole('button', { name: 'Done' }).click()
   await page.getByRole('button', { name: 'New collection' }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).not.toHaveCSS('background-color', lightPaper)
   await expect(dialog.locator('.MuiOutlinedInput-root').first()).not.toHaveCSS('background-color', lightPaper)
   await dialog.getByRole('button', { name: 'Cancel' }).click()
+  await settings.click()
   await toggle.uncheck()
   await page.reload()
+  await settings.click()
   await expect(toggle).not.toBeChecked()
   await expect(surface).toHaveCSS('background-color', light)
+})
+
+test('PDFs stay in their collection across reload and service replacement, download intact, and can be deleted', async ({ page }) => {
+  test.setTimeout(60_000)
+  const token = await signIn(page)
+  const headers = { Authorization: 'Bearer ' + token }
+  for (const name of ['Collection A', 'Collection B']) {
+    expect((await page.request.post('/api/collections', { headers, data: { name } })).status()).toBe(201)
+  }
+  await page.reload()
+  const open = (name: string) => page.getByRole('link', { name, exact: true }).click()
+  await open('Collection A')
+  const path = new URL(page.url()).pathname
+  const input = page.getByLabel('Choose PDF')
+  await expect(page.getByRole('heading', { name: 'No PDFs yet' })).toBeVisible()
+  await input.setInputFiles({ name: 'broken.pdf', mimeType: 'application/pdf', buffer: Buffer.from('invalid') })
+  await expect(page.getByRole('alert')).toContainText('Choose a PDF')
+  await input.setInputFiles({ name: 'large.pdf', mimeType: 'application/pdf', buffer: Buffer.alloc(10 * 1024 * 1024 + 1) })
+  await expect(page.getByRole('alert')).toContainText('10 MiB')
+  const gatewayLimit = page.waitForResponse(res => res.url().endsWith('/documents') && res.request().method() === 'POST')
+  await input.setInputFiles({ name: 'over-gateway-limit.pdf', mimeType: 'application/pdf', buffer: Buffer.alloc(12 * 1024 * 1024) })
+  expect((await gatewayLimit).status()).toBe(413)
+  await expect(page.getByRole('alert')).toContainText('10 MiB')
+  const pdf = await readFile(new URL('../../../document-service/tests/fixtures/one-page.pdf', import.meta.url))
+  const chooser = page.waitForEvent('filechooser')
+  await page.getByRole('button', { name: 'Upload PDF' }).click()
+  await (await chooser).setFiles({ name: 'Notes.pdf', mimeType: 'application/pdf', buffer: pdf })
+  const row = page.getByRole('listitem').filter({ hasText: 'Notes.pdf' })
+  await expect(row).toContainText('Uploaded')
+  await expect(row).toContainText('No selectable text')
+  await row.getByRole('button', { name: 'Retry indexing' }).click()
+  await expect(row).toContainText('No selectable text')
+  expect(new URL(page.url()).pathname).toBe(path)
+  await open('Collections')
+  await open('Collection B')
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'No PDFs yet' })).toBeVisible()
+  await open('Collections')
+  await open('Collection A')
+  // Replacing the isolated container also rules out storage in its writable layer.
+  const compose = fileURLToPath(new URL('../../../docker-compose.e2e.yaml', import.meta.url))
+  await promisify(execFile)('docker', ['compose', '-f', compose, 'up', '-d', '--no-deps', '--force-recreate', '--wait', 'document-service'], { timeout: 30_000 })
+  await expect.poll(async () => (await page.request.get('/health/documents')).status()).toBe(200)
+  await page.reload()
+  await expect(row).toBeVisible()
+  const downloaded = page.waitForEvent('download')
+  await row.getByRole('button', { name: 'Download Notes.pdf' }).click()
+  const download = await downloaded
+  expect(download.suggestedFilename()).toBe('Notes.pdf')
+  const saved = await download.path()
+  expect(saved && await readFile(saved)).toEqual(pdf)
+  await row.getByRole('button', { name: 'Delete Notes.pdf' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toContainText('Notes.pdf')
+  await dialog.getByRole('button', { name: 'Cancel' }).click()
+  await row.getByRole('button', { name: 'Delete Notes.pdf' }).click()
+  await dialog.getByRole('button', { name: 'Delete PDF' }).click()
+  await expect(page.getByRole('heading', { name: 'No PDFs yet' })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'No PDFs yet' })).toBeVisible()
 })

@@ -1,29 +1,42 @@
 import { createTheme } from '@mui/material/styles'
 
+const yellow = { main: '#ffe047', light: '#ffed94', dark: '#e6c322', contrastText: '#000' }
+const white = { main: '#fff', light: '#fff', dark: '#ccc', contrastText: '#000' }
+
 export const theme = createTheme({
   cssVariables: { colorSchemeSelector: 'class' },
   colorSchemes: {
     light: { palette: {
-      primary: { main: '#287eff', dark: '#1664d8', contrastText: '#fff' },
-      background: { default: '#e9edf3', paper: '#fff' },
-      text: { primary: '#0b1020', secondary: '#5d7093' },
-      divider: '#dce3ed',
+      primary: { main: '#3235e6', dark: '#2224b9', contrastText: '#fff' },
+      background: { default: '#edeef2', paper: '#fff' },
+      text: { primary: '#171923', secondary: '#565e70' },
+      divider: '#cdd1dc',
     } },
     dark: { palette: {
-      primary: { main: '#83b5ff', dark: '#599cfa', contrastText: '#0b172b' },
-      background: { default: '#0d192a', paper: '#162942' },
-      text: { primary: '#eff5ff', secondary: '#b4c6df' },
-      divider: '#3b516d',
+      primary: yellow, secondary: white,
+      error: yellow, warning: yellow, info: white, success: white,
+      background: { default: '#000', paper: '#141414' },
+      text: { primary: '#fff', secondary: '#c2c2c2' },
+      divider: '#444',
     } },
   },
   typography: {
-    fontFamily: 'Arial, Helvetica, sans-serif',
+    fontFamily: '"DM Sans Variable", Arial, Helvetica, sans-serif',
     h1: { fontSize: '2.25rem', fontWeight: 700, letterSpacing: '-0.07rem' },
     h2: { fontSize: '2.15rem', fontWeight: 700, lineHeight: 1.18 },
     button: { textTransform: 'none', fontSize: '1rem', fontWeight: 600 },
   },
   shape: { borderRadius: 8 },
   components: {
+    MuiDialog: { defaultProps: { transitionDuration: { enter: 150, exit: 100 } }, styleOverrides: {
+      paper: { border: '1px solid var(--mui-palette-divider)', borderRadius: 14, backgroundImage: 'none' },
+    } },
+    MuiDialogTitle: { styleOverrides: { root: { fontWeight: 700, letterSpacing: '-.035em' } } },
+    MuiDialogActions: { styleOverrides: { root: {
+      padding: '14px 24px', gap: 6, borderTop: '1px solid var(--mui-palette-divider)',
+      backgroundColor: 'color-mix(in srgb, var(--mui-palette-background-default) 42%, var(--mui-palette-background-paper))',
+      '& .MuiButton-root': { minHeight: 44, paddingInline: 16 },
+    } } },
     MuiButtonBase: { styleOverrides: {
       root: { '&.Mui-focusVisible': { outline: '3px solid var(--mui-palette-primary-main)', outlineOffset: 2 } },
     } },

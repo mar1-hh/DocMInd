@@ -64,7 +64,7 @@ export function CollectionDialog({ action, onClose, onSaved }: {
         <Stack spacing={2.5} sx={{ pt: 1 }}>
           {error && <Alert severity="error">{error}</Alert>}
           {deleting ? <DialogContentText id="delete-explanation" sx={{ overflowWrap: 'anywhere' }}>
-            Delete <strong>{item?.name}</strong>? This action cannot be undone.
+            Delete <strong>{item?.name}</strong> and all its PDFs? This action cannot be undone.
           </DialogContentText> : <>
             <TextField id="collection-name" autoFocus required label="Name" value={name} inputRef={nameInput} disabled={pending}
               onChange={event => setName(event.target.value)} error={!!fields.name} helperText={fields.name} />
@@ -74,9 +74,9 @@ export function CollectionDialog({ action, onClose, onSaved }: {
           </>}
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 3 }}>
+      <DialogActions>
         <Button ref={cancelButton} autoFocus={deleting} disabled={pending} onClick={onClose}>Cancel</Button>
-        <Button type="submit" variant="contained" color={deleting ? 'error' : 'primary'} disabled={pending}>
+        <Button type="submit" variant="contained" loading={pending} color={deleting ? 'error' : 'primary'} disabled={pending}>
           {deleting ? 'Delete collection' : item ? 'Save changes' : 'Create collection'}
         </Button>
       </DialogActions>

@@ -17,6 +17,7 @@ export default mergeConfig(config, defineConfig({
     port: 4173,
     strictPort: true,
     proxy: {
+      '/api/chat': { target: 'http://nginx', changeOrigin: true },
       '/api/collections': { target: 'http://nginx', changeOrigin: true },
       '/api/auth': { target: 'http://nginx', changeOrigin: true },
       '/health': { target: 'http://nginx', changeOrigin: true },
