@@ -2,7 +2,7 @@
 
 DocMind lets you ask questions about PDFs and check the answers against the original pages. Organize files into a collection, choose which documents to search, and follow an inline citation to its supporting passage or PDF page.
 
-![DocMind chat with a selected citation and its supporting passage](docs/screenshots/chat.png)
+![Field Notes chat with two of three PDFs selected and an answer citing page 2 of field-guide.pdf](docs/screenshots/chat.png)
 
 [Collections dashboard](docs/screenshots/collections.png) · [Mobile evidence panel](docs/screenshots/mobile-evidence.png) · [Login](docs/screenshots/login.png) · [Register](docs/screenshots/register.png) · [API reference](docs/api.md)
 
@@ -33,7 +33,7 @@ After changing the Gemini key or answer model, run `docker compose up -d --no-de
 ### Try a question with a known answer
 
 1. Create a collection, open it, and choose **Upload documents**. Use the included [two-page field guide](chatbot-service/tests/field-guide.pdf).
-2. When the PDF shows **Ready**, leave it checked and ask **“What is the project code name?”**
+2. Once indexing finishes, the filename appears with a yellow underline to show it is selected. Click a filename to include or exclude it. With **field-guide** selected, ask **“What is the project code name?”**
 3. The expected answer is **Juniper**. Click the citation to read the passage, then choose **Open page 2** to check it in the PDF.
 
 Each upload accepts one text-based PDF up to 10 MiB. Scanned pages need selectable text for indexing. Passage text and filenames go to Gemini for embedding. When you ask a question, Gemini receives the question and retrieved passages from the selected PDFs.
