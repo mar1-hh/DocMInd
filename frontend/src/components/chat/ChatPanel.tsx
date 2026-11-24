@@ -87,8 +87,6 @@ export function ChatPanel({ id, selected, files, saved, mobile }: { mobile: bool
       </div>}
       <form className="composer" onSubmit={e => { e.preventDefault(); submit(question) }}>
         <input required aria-label="Question" maxLength={2000} placeholder="Ask about these documents" value={question}
-          onPointerDown={e => { e.currentTarget.dataset.pointerFocus = 'true' }}
-          onBlur={e => { delete e.currentTarget.dataset.pointerFocus }}
           onChange={e => setQuestion(e.target.value)} />
         <Button type="submit" variant="contained" aria-label="Ask question" loading={pending} disabled={!enabled}>Ask</Button>
       </form>

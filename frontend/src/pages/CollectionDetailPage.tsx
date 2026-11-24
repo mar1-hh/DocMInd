@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Alert, Button, Checkbox, IconButton, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, useMediaQuery, LinearProgress } from '@mui/material'
+import { Alert, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, useMediaQuery, LinearProgress } from '@mui/material'
 import { errorMessage } from '../api/auth'
 import { getCollection, type Collection } from '../api/collections'
 import { deleteDocument, downloadPdf, indexDocument, listDocuments, uploadPdf, type CollectionDocument } from '../api/documents'
@@ -9,7 +9,7 @@ import { WorkspaceLayout } from '../components/collections/WorkspaceLayout'
 import { ReadingPanel } from '../components/chat/ReadingPanel'
 import { ChatPanel } from '../components/chat/ChatPanel'
 
-import { Status } from '../components/collections/Status'
+import { DocumentRow } from '../components/collections/DocumentRow'
 import { WorkspaceIcon } from '../components/collections/WorkspaceIcon'
 
 function Documents({ id }: { id: string }) {
@@ -19,6 +19,9 @@ function Documents({ id }: { id: string }) {
   const [result, setResult] = useState<{ version: number; collection?: Collection; files?: CollectionDocument[]; error?: string }>()
   const [excluded, setExcluded] = useState<string[]>([])
   const selected = (result?.files ?? []).filter(doc => doc.indexStatus === 'ready' && !excluded.includes(doc.id)).map(doc => doc.id)
+  const count = result?.files && <span className="panel-count" role="status" aria-label="Documents selected">
+    {selected.length} of {result.files.length}
+  </span>
   const [pending, setPending] = useState('')
   const [error, setError] = useState('')
   const [confirm, setConfirm] = useState<CollectionDocument | null>(null)
@@ -86,34 +89,24 @@ function Documents({ id }: { id: string }) {
     <div className="collection-detail-columns">
       {mobile && <Button className="panel-trigger documents-trigger" variant="outlined"
         aria-haspopup="dialog" aria-expanded={documentsOpen} onClick={() => setDocumentsOpen(true)}>
-        Documents <span>{selected.length} selected</span>
+        Documents {count}
       </Button>}
-      <ReadingPanel title="Documents" mobile={mobile} open={documentsOpen} onClose={() => setDocumentsOpen(false)}>
+      <ReadingPanel title="Documents" titleDetail={count} mobile={mobile} open={documentsOpen} onClose={() => setDocumentsOpen(false)}>
         <section aria-label="Documents" aria-busy={loading || pending === 'upload'}>
-          <header className="document-heading">{!mobile && <div className="panel-heading"><h2>Documents</h2>
-            {result?.files && <span className="panel-count" aria-label={selected.length + ' documents selected'}>{selected.length} selected</span>}
-          </div>}<p>Answers draw only from checked files.</p></header>
+          {!mobile && <header className="panel-heading document-heading"><h2>Documents</h2>{count}</header>}
           {loading && <LinearProgress aria-label="Loading documents" />}
           {pending === 'upload' && <LinearProgress aria-label="Uploading PDF" />}
           {!loading && result?.error && <Alert severity="error" action={<Button onClick={refresh}>Retry</Button>}>{result.error}</Alert>}
           {error && !confirm && <Alert severity="error">{error}</Alert>}
           {result?.files?.length === 0 && !loading && <div className="collections-empty"><h2>No PDFs yet</h2>
             <p>Upload a PDF to this collection.</p></div>}
-          {!!result?.files?.length && <ul className="document-list">{result.files.map(doc => <li key={doc.id}>
-            <label className="document-choice">
-              <Checkbox size="small" disabled={doc.indexStatus !== 'ready'} checked={selected.includes(doc.id)}
-                onChange={e => setExcluded(old => e.target.checked ? old.filter(x => x !== doc.id) : [...old, doc.id])} />
-              <WorkspaceIcon name="file" /><strong>{doc.originalFilename}</strong><Status value={doc.indexStatus} compact />
-            </label>
-            {doc.indexError && <p className="index-error">{doc.indexError}</p>}
-            <div className="doc-actions"><time dateTime={doc.uploadedAt}>Uploaded {new Date(doc.uploadedAt).toLocaleDateString()}</time>
-              {doc.indexStatus === 'failed' && <Button size="small" disabled={!!pending} onClick={() => void perform('index', () => indexDocument(id, doc.id))}>Retry indexing</Button>}
-              <Button size="small" aria-label={'Download ' + doc.originalFilename} disabled={!!pending}
-                onClick={() => void perform('download', () => downloadPdf(id, doc))}>Download</Button>
-              <IconButton size="small" aria-label={'Delete ' + doc.originalFilename} disabled={!!pending}
-                onClick={() => { setError(''); setConfirm(doc) }}><WorkspaceIcon name="trash" /></IconButton>
-            </div>
-          </li>)}</ul>}
+          {!!result?.files?.length && <ul className="document-list">{result.files.map(doc =>
+            <DocumentRow key={doc.id} doc={doc} selected={selected.includes(doc.id)} busy={!!pending}
+              onSelect={checked => setExcluded(old => checked ? old.filter(id => id !== doc.id) : [...old, doc.id])}
+              onRetry={() => void perform('index', () => indexDocument(id, doc.id))}
+              onDownload={() => void perform('download', () => downloadPdf(id, doc))}
+              onDelete={() => { setError(''); setConfirm(doc) }} />
+          )}</ul>}
         </section>
       </ReadingPanel>
       <ChatPanel mobile={mobile} id={id} selected={selected} files={(result?.files ?? []).map(doc => doc.id)} saved={result?.collection?.latestChat} />

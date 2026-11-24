@@ -35,6 +35,32 @@ async function login(page: Page, user: TestUser) {
   await expect(page.getByRole('button', { name: `Account for ${user.name}`, exact: true })).toBeVisible()
 }
 
+test('auth fields and password toggles use neutral focus feedback', async ({ page }) => {
+  for (const route of ['/login', '/register']) {
+    await page.goto(route)
+    const fields = page.locator('.auth-sheet .MuiOutlinedInput-root')
+    await expect(fields).toHaveCount(route === '/login' ? 2 : 4)
+    for (const field of await fields.all()) {
+      const input = field.locator('input')
+      await input.click()
+      await expect(input).toBeFocused()
+      await expect(input).toHaveCSS('outline-style', 'none')
+      await expect(field).toHaveCSS('outline-style', 'none')
+      await expect(field.locator('fieldset')).toHaveCSS('border-top-width', '1px')
+      await expect(field.locator('fieldset')).toHaveCSS('border-top-color', 'rgb(86, 94, 112)')
+      if (await input.getAttribute('type') === 'password') {
+        await input.press('Tab')
+        const eye = field.getByRole('button')
+        await expect(eye).toBeFocused()
+        await expect(eye).toHaveCSS('outline-style', 'none')
+        await expect(eye).toHaveCSS('background-color', await input.evaluate(el => getComputedStyle(el).color))
+        await eye.press('Space')
+        await expect(input).toHaveAttribute('type', 'text')
+      }
+    }
+  }
+})
+
 test('successful registration returns to sign in without creating a session', async ({ page }) => {
   const user = uniqueUser()
   await register(page, user)
