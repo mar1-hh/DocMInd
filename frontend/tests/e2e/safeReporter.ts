@@ -28,9 +28,9 @@ export default class SafeReporter implements Reporter {
     console.log(`${result.status.toUpperCase()}: ${test.title}${hint}`)
   }
   onError() {
-    console.error('E2E runner/setup error. Check the isolated stack health and Chromium installation; see docs/testing/auth-e2e.md.')
+    console.error('E2E runner/setup error. Check the isolated stack health and Chromium installation; see the Testing section in README.md.')
   }
   onEnd(result: FullResult) {
-    console.log(`Authentication E2E run: ${result.status}; ${this.passed} passed, ${this.failed} failed, ${this.skipped} skipped`)
+    console.log(`DocMind E2E run: ${result.status}; ${this.passed} passed, ${this.failed} failed, ${this.skipped} skipped`)
   }
 }

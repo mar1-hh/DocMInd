@@ -1,0 +1,22 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+
+# Dependencies, builds and test output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+*.log
+__pycache__/
+.venv/
+test-results/
+playwright-report/
+.DS_Store
+
+# Local design tooling and working screenshots
+/.agents/skills/
+/skills-lock.json
+/frontend/screenshots/
+/docs/screenshots/redesign/
